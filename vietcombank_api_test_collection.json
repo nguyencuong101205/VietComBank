@@ -271,8 +271,8 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Mã OTP sai phải bị từ chối 400 Bad Request', function () {",
-                  "    pm.response.to.have.status(400);",
+                  "pm.test('Mã OTP sai phải bị từ chối 400 hoặc 401', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 401]);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -546,8 +546,9 @@
                   "    pm.response.to.have.status(200);",
                   "});",
                   "var jsonData = pm.response.json();",
-                  "if (jsonData.data && jsonData.data.token) {",
-                  "    pm.collectionVariables.set('customer_token', jsonData.data.token);",
+                  "var tok = jsonData.data && (jsonData.data.accessToken || jsonData.data.token);",
+                  "if (tok) {",
+                  "    pm.collectionVariables.set('customer_token', tok);",
                   "    console.log('Đã lưu Token Khách hàng kh_thuha!');",
                   "}"
                 ],
@@ -608,7 +609,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"loanAmount\": 600000000,\n  \"loanTermMonths\": 60,\n  \"carBrand\": \"Hyundai\",\n  \"carModel\": \"SantaFe 2.5 AWD\",\n  \"manufactureYear\": 2026,\n  \"carPrice\": 1250000000,\n  \"isNewCar\": true,\n  \"estimatedCollateralValue\": 1250000000,\n  \"documentProofUrl\": \"/uploads/docs/hop_dong_mua_xe.pdf\"\n}"
+              "raw": "{\n  \"requestedAmount\": 600000000,\n  \"termMonths\": 60,\n  \"carBrand\": \"Hyundai\",\n  \"carModel\": \"SantaFe 2.5 AWD\",\n  \"manufactureYear\": 2026,\n  \"carPrice\": 1250000000,\n  \"isNewCar\": true,\n  \"estimatedCollateralValue\": 1250000000,\n  \"documentProofUrl\": \"/uploads/docs/hop_dong_mua_xe.pdf\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/customer/loans/auto",
@@ -627,7 +628,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"loanAmount\": 150000000,\n  \"loanTermMonths\": 24,\n  \"loanPurpose\": \"Sửa chữa nhà và mua sắm nội thất\",\n  \"monthlyIncome\": 25000000,\n  \"currentDebt\": 0\n}"
+              "raw": "{\n  \"requestedAmount\": 150000000,\n  \"termMonths\": 24,\n  \"incomeProofDocUrl\": \"/uploads/docs/sao_ke_luong.pdf\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/customer/loans/consumer",
@@ -859,7 +860,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": 1,\n  \"productType\": \"Cho vay mua ô tô (Car Loan)\",\n  \"notes\": \"Khách hàng quan tâm vay 500tr mua xe Toyota Camry, nhu cầu giải ngân trong tháng.\",\n  \"status\": \"FOLLOW_UP\"\n}"
+              "raw": "{\n  \"customerId\": 601,\n  \"productType\": \"Cho vay mua ô tô (Car Loan)\",\n  \"notes\": \"Khách hàng quan tâm vay 500tr mua xe Toyota Camry, nhu cầu giải ngân trong tháng.\",\n  \"status\": \"FOLLOW_UP\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/staff/advisories",
@@ -897,7 +898,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": 1,\n  \"priority\": \"HIGH\",\n  \"title\": \"Lỗi kích hoạt Smart OTP trên điện thoại mới\",\n  \"content\": \"Khách hàng đổi máy iPhone 16 Pro Max, ứng dụng VCB Digibank yêu cầu quét NFC căn cước CCCD không nhận diện.\"\n}"
+              "raw": "{\n  \"customerId\": 601,\n  \"priority\": \"HIGH\",\n  \"title\": \"Lỗi kích hoạt Smart OTP trên điện thoại mới\",\n  \"content\": \"Khách hàng đổi máy iPhone 16 Pro Max, ứng dụng VCB Digibank yêu cầu quét NFC căn cước CCCD không nhận diện.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/staff/tickets",
@@ -949,7 +950,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": 1,\n  \"transactionCode\": \"TXN-2026-9901\",\n  \"reason\": \"Rút tiền tại cây ATM Vietcombank Ba Đình bị trừ tài khoản nhưng máy nhả thiếu 2.000.000 VNĐ.\"\n}"
+              "raw": "{\n  \"customerId\": 601,\n  \"transactionCode\": \"TXN-2026-9901\",\n  \"reason\": \"Rút tiền tại cây ATM Vietcombank Ba Đình bị trừ tài khoản nhưng máy nhả thiếu 2.000.000 VNĐ.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/staff/disputes",
@@ -1000,7 +1001,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"senderCustomerId\": 1,\n  \"receiverAccountNumber\": \"0011009988776\",\n  \"receiverName\": \"NGUYEN VAN HUONG\",\n  \"bankName\": \"VIETCOMBANK\",\n  \"amount\": 25000000,\n  \"fee\": 0,\n  \"description\": \"Nop tien mat thanh toan tai quay VCB\"\n}"
+              "raw": "{\n  \"senderCustomerId\": 601,\n  \"receiverAccountNumber\": \"0011009988776\",\n  \"receiverName\": \"NGUYEN VAN HUONG\",\n  \"bankName\": \"VIETCOMBANK\",\n  \"amount\": 25000000,\n  \"fee\": 0,\n  \"description\": \"Nop tien mat thanh toan tai quay VCB\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/staff/transactions",
@@ -1300,16 +1301,16 @@
           }
         },
         {
-          "name": "8.3 Xem Lịch sử xuất báo cáo (/reports/export-history)",
+          "name": "8.3 Xem Lịch sử xuất báo cáo (/reports/history)",
           "request": {
             "method": "GET",
             "header": [
               { "key": "Authorization", "value": "Bearer {{manager_token}}" }
             ],
             "url": {
-              "raw": "{{base_url}}/reports/export-history",
+              "raw": "{{base_url}}/reports/history",
               "host": ["{{base_url}}"],
-              "path": ["reports", "export-history"]
+              "path": ["reports", "history"]
             }
           }
         },

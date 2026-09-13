@@ -301,8 +301,8 @@
         "Authorization": "Bearer {{customer_token}}"
       },
       "testData": {
-        "loanAmount": 600000000,
-        "loanTermMonths": 60,
+        "requestedAmount": 600000000,
+        "termMonths": 60,
         "carBrand": "Hyundai",
         "carModel": "SantaFe 2.5 AWD",
         "manufactureYear": 2026,
@@ -327,11 +327,9 @@
         "Authorization": "Bearer {{customer_token}}"
       },
       "testData": {
-        "loanAmount": 150000000,
-        "loanTermMonths": 24,
-        "loanPurpose": "Sửa chữa nhà và mua sắm nội thất",
-        "monthlyIncome": 25000000,
-        "currentDebt": 0
+        "requestedAmount": 150000000,
+        "termMonths": 24,
+        "incomeProofDocUrl": "/uploads/docs/sao_ke_luong.pdf"
       },
       "expectedResult": "HTTP 200 OK. Tạo hồ sơ vay tín chấp tiêu dùng thành công.",
       "uiBehavior": "Hiển thị thông báo thành công."
