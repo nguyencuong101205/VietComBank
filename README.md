@@ -1,4 +1,4 @@
-# Admin Portal Ngân hàng — BTL
+# Admin Portal Ngân hàng — VietComBank
 
 Hệ thống quản trị dành cho ngân hàng: xác thực 2FA, cập nhật dữ liệu biến động (tỷ giá/vàng/lãi suất), phê duyệt hồ sơ, báo cáo thống kê, phân quyền RBAC, CMS và Audit Log.
 
