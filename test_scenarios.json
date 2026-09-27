@@ -1,32 +1,60 @@
 {
   "project": "Vietcombank Digital Banking & Admin Management System",
-  "version": "1.0.0",
-  "generatedDate": "2026-09-09",
-  "author": "QA & Engineering Team",
+  "version": "2.0.0",
+  "updatedDate": "2026-09-13",
+  "author": "QA & Core Banking Engineering Team",
   "summary": {
-    "totalTestCases": 24,
+    "totalTestCases": 32,
     "modules": [
       "AUTHENTICATION_2FA",
-      "CUSTOMER_PORTAL",
       "RBAC_SECURITY",
+      "CUSTOMER_PORTAL",
       "LOAN_APPROVAL",
       "STAFF_OPERATIONS",
+      "PUBLIC_PORTAL_CHATBOT",
       "FINANCIAL_RATES_CMS",
-      "CHATBOT_PUBLIC_WEB",
-      "AUDIT_REPORTS"
+      "REPORTS_AUDIT"
     ],
     "environment": {
       "backendUrl": "http://localhost:8080/api/v1",
       "frontendAdminUrl": "http://localhost:5173",
       "frontendCustomerUrl": "http://localhost:5173/#/customer/login",
+      "frontendPublicUrl": "http://localhost:5173/#/",
       "database": "admin_portal_db (MySQL 8.0+)"
-    }
+    },
+    "testRoles": [
+      {
+        "role": "ROLE_ADMIN",
+        "account": "admin_super / Admin@123",
+        "description": "Quản trị viên toàn quyền hệ thống (Users, Roles, Audit Logs, CMS, Rates)"
+      },
+      {
+        "role": "ROLE_MANAGER",
+        "account": "ql_minhtuan / Manager@123",
+        "description": "Quản lý thẩm định & phê duyệt hồ sơ tín dụng, xem báo cáo thống kê. BỊ CHẶN giao dịch quầy & lịch hẹn."
+      },
+      {
+        "role": "ROLE_STAFF",
+        "account": "nv_hoangnam / Staff@123",
+        "description": "Giao dịch viên quầy (Tư vấn CRM, Ticket CSKH, Tra soát Dispute, Chuyển tiền, Quản lý Lịch hẹn Chatbot)"
+      },
+      {
+        "role": "ROLE_CUSTOMER",
+        "account": "kh_thuha / Customer@123",
+        "description": "Khách hàng cá nhân số (Vay ô tô, Vay tiêu dùng, Mở thẻ tín dụng, Gửi tiết kiệm online)"
+      },
+      {
+        "role": "GUEST",
+        "account": "Khách vãng lai / Không cần đăng nhập",
+        "description": "Xem tỷ giá, giá vàng, lãi suất, tin tức, nộp hồ sơ vay trực tuyến, đặt lịch hẹn Chatbot"
+      }
+    ]
   },
   "testCases": [
     {
       "id": "TC-AUTH-01",
       "module": "AUTHENTICATION_2FA",
-      "title": "Đăng nhập 2 bước cán bộ quản trị - Bước 1 lấy OTP thành công",
+      "title": "Đăng nhập Cán bộ Bước 1 - Lấy mã xác thực OTP 2FA",
       "type": "FUNCTIONAL",
       "priority": "CRITICAL",
       "role": "ADMIN",
@@ -36,13 +64,13 @@
         "username": "admin_super",
         "password": "Admin@123"
       },
-      "expectedResult": "HTTP 200 OK. Trả về tempToken và chuỗi 6 chữ số devOtp (trong môi trường DEV). Bước này CHƯA cấp JWT accessToken.",
-      "uiBehavior": "Giao diện chuyển từ Form mật khẩu sang Form nhập OTP. Ô nhập OTP để trống và hiện thông báo chứa mã OTP dev để người dùng tự nhập tay."
+      "expectedResult": "HTTP 200 OK. Trả về tempToken và chuỗi 6 chữ số devOtp trong payload data. CHƯA cấp JWT accessToken.",
+      "uiBehavior": "Giao diện chuyển từ Form mật khẩu sang Form nhập OTP. Người dùng thấy mã OTP dev để điền và nhấn Xác thực."
     },
     {
       "id": "TC-AUTH-02",
       "module": "AUTHENTICATION_2FA",
-      "title": "Xác thực OTP thủ công - Đăng nhập hoàn tất nhận JWT",
+      "title": "Xác thực OTP Bước 2 - Đăng nhập hoàn tất nhận JWT Token",
       "type": "FUNCTIONAL",
       "priority": "CRITICAL",
       "role": "ADMIN",
@@ -50,285 +78,568 @@
       "endpoint": "POST /api/v1/auth/verify-otp",
       "testData": {
         "username": "admin_super",
-        "tempToken": "{{tempToken}}",
-        "otpCode": "{{devOtp}}"
+        "tempToken": "{{temp_token}}",
+        "otpCode": "{{dev_otp}}"
       },
       "expectedResult": "HTTP 200 OK. Trả về accessToken JWT, refreshToken và danh sách vai trò ['ROLE_ADMIN'].",
-      "uiBehavior": "Lưu token vào LocalStorage/SessionStorage, chuyển hướng thẳng vào trang Dashboard (/dashboard)."
+      "uiBehavior": "Lưu accessToken vào Storage, chuyển hướng ngay vào Dashboard Quản trị (/dashboard)."
     },
     {
       "id": "TC-AUTH-03",
       "module": "AUTHENTICATION_2FA",
-      "title": "Nhập sai mã OTP - Bị từ chối xác thực",
-      "type": "NEGATIVE",
+      "title": "Đăng nhập 2 bước Quản lý phê duyệt (ql_minhtuan)",
+      "type": "FUNCTIONAL",
+      "priority": "HIGH",
+      "role": "MANAGER",
+      "preConditions": "Tài khoản ql_minhtuan hoạt động bình thường",
+      "endpoint": "POST /api/v1/auth/login và POST /api/v1/auth/verify-otp",
+      "testData": {
+        "username": "ql_minhtuan",
+        "password": "Manager@123"
+      },
+      "expectedResult": "HTTP 200 OK. Trả về token có quyền ROLE_MANAGER (APPROVE_LOAN, REPORT_VIEW, REPORT_EXPORT).",
+      "uiBehavior": "Chuyển hướng vào trang Phê duyệt hồ sơ (/approvals). Không hiển thị các menu Giao dịch quầy hay Lịch hẹn."
+    },
+    {
+      "id": "TC-AUTH-04",
+      "module": "AUTHENTICATION_2FA",
+      "title": "Đăng nhập 2 bước Giao dịch viên (nv_hoangnam)",
+      "type": "FUNCTIONAL",
       "priority": "HIGH",
       "role": "STAFF",
-      "preConditions": "Đã hoàn thành bước 1, có tempToken",
+      "preConditions": "Tài khoản nv_hoangnam hoạt động bình thường",
+      "endpoint": "POST /api/v1/auth/login và POST /api/v1/auth/verify-otp",
+      "testData": {
+        "username": "nv_hoangnam",
+        "password": "Staff@123"
+      },
+      "expectedResult": "HTTP 200 OK. Trả về token có quyền ROLE_STAFF (STAFF_CUSTOMER_ADVISORY, STAFF_FINANCIAL_TX, STAFF_APPOINTMENT_MANAGE).",
+      "uiBehavior": "Chuyển hướng vào phân hệ Nghiệp vụ giao dịch viên. Hiển thị đủ các menu: Khách hàng, Tư vấn CRM, Hỗ trợ, Tra soát, Giao dịch, Lịch hẹn Chatbot."
+    },
+    {
+      "id": "TC-AUTH-05",
+      "module": "AUTHENTICATION_2FA",
+      "title": "Nhập sai mã OTP - Bị từ chối xác thực (Negative Test)",
+      "type": "NEGATIVE",
+      "priority": "HIGH",
+      "role": "ADMIN",
+      "preConditions": "Đã có tempToken từ bước 1",
       "endpoint": "POST /api/v1/auth/verify-otp",
       "testData": {
         "username": "admin_super",
-        "tempToken": "{{tempToken}}",
-        "otpCode": "999999"
+        "tempToken": "{{temp_token}}",
+        "otpCode": "000000"
       },
-      "expectedResult": "HTTP 400 Bad Request hoặc 401 Unauthorized. Thông báo lỗi: 'Mã OTP không chính xác hoặc đã hết hạn'.",
-      "uiBehavior": "Hiện toast thông báo lỗi màu đỏ, người dùng vẫn ở lại form nhập OTP để nhập lại."
+      "expectedResult": "HTTP 400 Bad Request. Thông báo lỗi: 'Mã OTP không chính xác hoặc đã hết hạn'.",
+      "uiBehavior": "Bật thông báo lỗi màu đỏ, người dùng ở lại form OTP để nhập lại."
     },
     {
       "id": "TC-RBAC-01",
       "module": "RBAC_SECURITY",
-      "title": "Kiểm tra quyền Admin truy cập danh mục Quản trị người dùng",
+      "title": "Kiểm tra quyền Admin Super truy cập Quản trị người dùng",
       "type": "SECURITY_POSITIVE",
       "priority": "CRITICAL",
       "role": "ADMIN",
-      "preConditions": "Đăng nhập bằng tài khoản admin_super, có token JWT của Admin",
+      "preConditions": "Có JWT Token của admin_super",
       "endpoint": "GET /api/v1/system/users",
       "headers": {
         "Authorization": "Bearer {{admin_token}}"
       },
-      "expectedResult": "HTTP 200 OK. Trả về toàn bộ danh sách cán bộ nhân viên và trạng thái tài khoản.",
-      "uiBehavior": "Truy cập được menu 'Quản trị hệ thống' -> 'Người dùng & Phân quyền'."
+      "expectedResult": "HTTP 200 OK. Trả về danh sách cán bộ, vai trò và trạng thái kích hoạt.",
+      "uiBehavior": "Hiển thị bảng danh sách người dùng, nút 'Thêm cán bộ mới', nút khóa/mở tài khoản."
     },
     {
       "id": "TC-RBAC-02",
       "module": "RBAC_SECURITY",
-      "title": "BẢO MẬT: Nhân viên quản lý phê duyệt gọi API Quản trị người dùng -> Phải bị chặn 403 Forbidden",
+      "title": "BẢO MẬT: Quản lý phê duyệt gọi API Quản trị Users -> Chặn 403 Forbidden",
       "type": "SECURITY_NEGATIVE",
       "priority": "BLOCKER",
       "role": "MANAGER",
-      "preConditions": "Đăng nhập bằng tài khoản ql_minhtuan (ROLE_MANAGER)",
+      "preConditions": "Đăng nhập bằng tài khoản ql_minhtuan",
       "endpoint": "GET /api/v1/system/users",
       "headers": {
         "Authorization": "Bearer {{manager_token}}"
       },
-      "expectedResult": "HTTP 403 FORBIDDEN. Backend Spring Security bắt @PreAuthorize('hasRole(\"ADMIN\")') và chặn triệt để.",
-      "uiBehavior": "Thanh sidebar của Quản lý phê duyệt KHÔNG HIỂN THỊ menu Quản trị hệ thống/Người dùng. Nếu cố gõ URL trực tiếp, màn hình hiển thị 403 Access Denied."
+      "expectedResult": "HTTP 403 FORBIDDEN. Spring Security chặn @PreAuthorize('hasRole(\"ADMIN\")').",
+      "uiBehavior": "Menu Quản trị người dùng ẩn hoàn toàn. Nếu nhập link thủ công sẽ thấy trang 403 Access Denied."
     },
     {
       "id": "TC-RBAC-03",
       "module": "RBAC_SECURITY",
-      "title": "BẢO MẬT: Nhân viên phê duyệt gọi API Giao dịch tài chính -> Phải bị chặn 403 Forbidden",
+      "title": "BẢO MẬT: Quản lý phê duyệt gọi API Giao dịch tài chính -> Chặn 403 Forbidden",
       "type": "SECURITY_NEGATIVE",
       "priority": "BLOCKER",
       "role": "MANAGER",
-      "preConditions": "Đăng nhập bằng tài khoản ql_minhtuan (ROLE_MANAGER - chỉ có quyền APPROVE_LOAN và REPORT_EXPORT)",
+      "preConditions": "Đăng nhập bằng tài khoản ql_minhtuan",
       "endpoint": "GET /api/v1/staff/transactions",
       "headers": {
         "Authorization": "Bearer {{manager_token}}"
       },
-      "expectedResult": "HTTP 403 FORBIDDEN. Backend Spring Security bắt @PreAuthorize('hasAnyAuthority(\"STAFF_FINANCIAL_TX\", \"ROLE_ADMIN\")') và chặn triệt để.",
-      "uiBehavior": "Menu Giao dịch tài chính ẩn hoàn toàn trên thanh điều hướng của Quản lý phê duyệt. Khi cố truy cập URL /staff/transactions sẽ nhận thông báo không có quyền."
+      "expectedResult": "HTTP 403 FORBIDDEN. Spring Security chặn vì Quản lý phê duyệt không có quyền STAFF_FINANCIAL_TX.",
+      "uiBehavior": "Menu Giao dịch tài chính không xuất hiện trên thanh điều hướng của Quản lý."
     },
     {
       "id": "TC-RBAC-04",
       "module": "RBAC_SECURITY",
-      "title": "BẢO MẬT: Nhân viên phê duyệt gọi API Lịch hẹn Chatbot -> Phải bị chặn 403 Forbidden",
+      "title": "BẢO MẬT: Quản lý phê duyệt gọi API Lịch hẹn Chatbot -> Chặn 403 Forbidden",
       "type": "SECURITY_NEGATIVE",
       "priority": "BLOCKER",
       "role": "MANAGER",
-      "preConditions": "Đăng nhập bằng tài khoản ql_minhtuan (ROLE_MANAGER)",
+      "preConditions": "Đăng nhập bằng tài khoản ql_minhtuan",
       "endpoint": "GET /api/v1/staff/appointments",
       "headers": {
         "Authorization": "Bearer {{manager_token}}"
       },
-      "expectedResult": "HTTP 403 FORBIDDEN. Backend Spring Security bắt @PreAuthorize('hasAnyAuthority(\"STAFF_FINANCIAL_TX\", \"STAFF_SUPPORT_TICKET\", \"ROLE_ADMIN\")') và chặn triệt để.",
-      "uiBehavior": "Menu Lịch hẹn Chatbot ẩn hoàn toàn trên thanh điều hướng của Quản lý phê duyệt. Việc quản lý lịch hẹn thuộc thẩm quyền của Giao dịch viên."
+      "expectedResult": "HTTP 403 FORBIDDEN. Quyền quản lý lịch hẹn thuộc về Giao dịch viên quầy (ROLE_STAFF).",
+      "uiBehavior": "Menu Lịch hẹn Chatbot không xuất hiện trên thanh điều hướng của Quản lý."
+    },
+    {
+      "id": "TC-RBAC-05",
+      "module": "RBAC_SECURITY",
+      "title": "BẢO MẬT: Giao dịch viên gọi API Phê duyệt hồ sơ -> Chặn 403 Forbidden",
+      "type": "SECURITY_NEGATIVE",
+      "priority": "BLOCKER",
+      "role": "STAFF",
+      "preConditions": "Đăng nhập bằng tài khoản nv_hoangnam",
+      "endpoint": "GET /api/v1/applications",
+      "headers": {
+        "Authorization": "Bearer {{staff_token}}"
+      },
+      "expectedResult": "HTTP 403 FORBIDDEN. Giao dịch viên không có quyền APPROVE_LOAN.",
+      "uiBehavior": "Menu Phê duyệt hồ sơ không hiển thị cho giao dịch viên."
+    },
+    {
+      "id": "TC-RBAC-06",
+      "module": "RBAC_SECURITY",
+      "title": "Admin tạo tài khoản cán bộ mới thành công",
+      "type": "FUNCTIONAL",
+      "priority": "HIGH",
+      "role": "ADMIN",
+      "preConditions": "Có JWT Token của admin_super",
+      "endpoint": "POST /api/v1/system/users",
+      "headers": {
+        "Authorization": "Bearer {{admin_token}}"
+      },
+      "testData": {
+        "username": "nv_tester2026",
+        "rawPassword": "Bank@12345",
+        "email": "tester2026@vietcombank.com.vn",
+        "fullName": "Trần Văn Kiểm Thử",
+        "phoneNumber": "0988112233",
+        "roleCodes": ["ROLE_STAFF"]
+      },
+      "expectedResult": "HTTP 200 OK hoặc 201 Created. Tạo người dùng mới trong DB và mã hóa mật khẩu BCrypt.",
+      "uiBehavior": "Modal tạo người dùng đóng lại, danh sách bảng cập nhật người dùng mới."
     },
     {
       "id": "TC-CUST-01",
       "module": "CUSTOMER_PORTAL",
-      "title": "Đăng ký tài khoản Khách hàng cá nhân trực tuyến",
+      "title": "Đăng ký trực tuyến tài khoản Khách hàng cá nhân (Individual)",
       "type": "FUNCTIONAL",
       "priority": "HIGH",
-      "role": "CUSTOMER_INDIVIDUAL",
-      "preConditions": "Số CCCD và số điện thoại chưa tồn tại trong hệ thống",
-      "endpoint": "POST /api/v1/customer/auth/register/individual",
+      "role": "GUEST",
+      "preConditions": "CCCD và số điện thoại chưa tồn tại trong hệ thống",
+      "endpoint": "POST /api/v1/customer/auth/register",
       "testData": {
-        "username": "kh_minhtriet",
+        "username": "kh_tester02",
         "password": "Customer@123",
-        "fullName": "Lê Minh Triết",
-        "idCardNumber": "079095001234",
-        "phoneNumber": "0933112233",
-        "email": "triet.le@gmail.com",
-        "monthlyIncome": 35000000
+        "fullName": "Đỗ Hoàng Minh",
+        "customerType": "INDIVIDUAL",
+        "idCardNumber": "001099887766",
+        "phoneNumber": "0966554433",
+        "email": "minh.do@vcbtest.vn",
+        "dateOfBirth": "1997-06-18",
+        "gender": "MALE",
+        "monthlyIncome": 28000000,
+        "companyName": "Công ty Cổ phần VinaTech",
+        "position": "Kỹ sư phần mềm"
       },
-      "expectedResult": "HTTP 201 Created hoặc 200 OK. Tạo thành công bản ghi trong bảng users và customer_profiles.",
-      "uiBehavior": "Thông báo đăng ký tài khoản thành công, tự động chuyển về trang đăng nhập Khách hàng."
+      "expectedResult": "HTTP 200 OK. Sinh tài khoản trong users và customer_profiles với vai trò ROLE_CUSTOMER, ROLE_INDIVIDUAL.",
+      "uiBehavior": "Thông báo đăng ký thành công, tự động đăng nhập hoặc chuyển sang trang đăng nhập khách hàng."
     },
     {
       "id": "TC-CUST-02",
       "module": "CUSTOMER_PORTAL",
       "title": "Đăng nhập Cổng Khách hàng Cá nhân (kh_thuha)",
       "type": "FUNCTIONAL",
-      "priority": "HIGH",
+      "priority": "CRITICAL",
       "role": "CUSTOMER_INDIVIDUAL",
-      "preConditions": "Tài khoản kh_thuha đã được tạo",
+      "preConditions": "Tài khoản kh_thuha hoạt động bình thường",
       "endpoint": "POST /api/v1/customer/auth/login",
       "testData": {
         "username": "kh_thuha",
         "password": "Customer@123"
       },
       "expectedResult": "HTTP 200 OK. Trả về customerToken và thông tin cá nhân của khách hàng.",
-      "uiBehavior": "Vào Dashboard khách hàng cá nhân hiển thị số dư, danh mục sản phẩm, gợi ý gói vay."
+      "uiBehavior": "Đăng nhập thành công, chuyển hướng trực tiếp sang Cổng thông tin khách hàng (Public Portal), thanh header hiển thị Tên khách hàng và nút Bảng điều khiển cá nhân."
     },
     {
-      "id": "TC-LOAN-01",
+      "id": "TC-CUST-03",
       "module": "CUSTOMER_PORTAL",
-      "title": "Khách hàng nộp hồ sơ Vay Mua Ô Tô thế chấp bằng xe",
+      "title": "Xem Thông tin Hồ sơ Khách hàng (/customer/profile)",
+      "type": "FUNCTIONAL",
+      "priority": "MEDIUM",
+      "role": "CUSTOMER_INDIVIDUAL",
+      "preConditions": "Có JWT Token của kh_thuha",
+      "endpoint": "GET /api/v1/customer/profile",
+      "headers": {
+        "Authorization": "Bearer {{customer_token}}"
+      },
+      "expectedResult": "HTTP 200 OK. Trả về họ tên, CCCD, số điện thoại, mức thu nhập, loại khách hàng INDIVIDUAL.",
+      "uiBehavior": "Hiển thị thông tin cá nhân trên trang Hồ sơ khách hàng."
+    },
+    {
+      "id": "TC-CUST-04",
+      "module": "CUSTOMER_PORTAL",
+      "title": "Khách hàng nộp hồ sơ Vay Mua Ô Tô thế chấp bằng xe (Auto Loan)",
       "type": "FUNCTIONAL",
       "priority": "HIGH",
       "role": "CUSTOMER_INDIVIDUAL",
-      "preConditions": "Khách hàng đã đăng nhập (kh_namle hoặc kh_thuha)",
+      "preConditions": "Có JWT Token của kh_thuha",
       "endpoint": "POST /api/v1/customer/loans/auto",
       "headers": {
         "Authorization": "Bearer {{customer_token}}"
       },
       "testData": {
-        "loanAmount": 500000000,
-        "loanTermMonths": 60,
-        "carBrand": "Toyota",
-        "carModel": "Camry 2.5Q 2026",
+        "requestedAmount": 600000000,
+        "termMonths": 60,
+        "carBrand": "Hyundai",
+        "carModel": "SantaFe 2.5 AWD",
         "manufactureYear": 2026,
-        "carPrice": 1400000000,
+        "carPrice": 1250000000,
         "isNewCar": true,
-        "estimatedCollateralValue": 1400000000
+        "estimatedCollateralValue": 1250000000,
+        "documentProofUrl": "/uploads/docs/hop_dong_mua_xe.pdf"
       },
-      "expectedResult": "HTTP 200 OK. Tạo hồ sơ vay với trạng thái 'PENDING' (Chờ thẩm định), sinh mã hồ sơ ví dụ APP-AUTO-202609-01.",
-      "uiBehavior": "Hiển thị trang xác nhận nộp hồ sơ thành công và xuất hiện trong mục 'Hồ sơ của tôi'."
+      "expectedResult": "HTTP 200 OK. Tạo hồ sơ vay mua ô tô kèm tài sản thế chấp trong bảng collateral_vehicles, trạng thái PENDING.",
+      "uiBehavior": "Modal hoặc form nộp hồ sơ đóng, hiện thông báo thành công và mã hồ sơ được lưu vào danh sách của tôi."
+    },
+    {
+      "id": "TC-CUST-05",
+      "module": "CUSTOMER_PORTAL",
+      "title": "Khách hàng nộp hồ sơ Vay Tiêu dùng (Consumer Loan)",
+      "type": "FUNCTIONAL",
+      "priority": "MEDIUM",
+      "role": "CUSTOMER_INDIVIDUAL",
+      "preConditions": "Có JWT Token của kh_thuha",
+      "endpoint": "POST /api/v1/customer/loans/consumer",
+      "headers": {
+        "Authorization": "Bearer {{customer_token}}"
+      },
+      "testData": {
+        "requestedAmount": 150000000,
+        "termMonths": 24,
+        "incomeProofDocUrl": "/uploads/docs/sao_ke_luong.pdf"
+      },
+      "expectedResult": "HTTP 200 OK. Tạo hồ sơ vay tín chấp tiêu dùng thành công.",
+      "uiBehavior": "Hiển thị thông báo thành công."
+    },
+    {
+      "id": "TC-CUST-06",
+      "module": "CUSTOMER_PORTAL",
+      "title": "Khách hàng đăng ký Mở thẻ Tín dụng Quốc tế (Credit Card)",
+      "type": "FUNCTIONAL",
+      "priority": "MEDIUM",
+      "role": "CUSTOMER_INDIVIDUAL",
+      "preConditions": "Có JWT Token của kh_thuha",
+      "endpoint": "POST /api/v1/customer/cards",
+      "headers": {
+        "Authorization": "Bearer {{customer_token}}"
+      },
+      "testData": {
+        "cardType": "VISA_PLATINUM",
+        "requestedLimit": 80000000,
+        "monthlyIncome": 30000000,
+        "salaryPaymentMethod": "BANK_TRANSFER"
+      },
+      "expectedResult": "HTTP 200 OK. Tạo hồ sơ phát hành thẻ tín dụng hạn mức 80 triệu VNĐ.",
+      "uiBehavior": "Xác nhận nộp hồ sơ thành công."
+    },
+    {
+      "id": "TC-CUST-07",
+      "module": "CUSTOMER_PORTAL",
+      "title": "Khách hàng Mở Sổ Tiết kiệm Trực tuyến (Savings)",
+      "type": "FUNCTIONAL",
+      "priority": "MEDIUM",
+      "role": "CUSTOMER_INDIVIDUAL",
+      "preConditions": "Có JWT Token của kh_thuha",
+      "endpoint": "POST /api/v1/customer/savings",
+      "headers": {
+        "Authorization": "Bearer {{customer_token}}"
+      },
+      "testData": {
+        "productCode": "SAVING_ONLINE_12M",
+        "depositAmount": 100000000,
+        "termMonths": 12,
+        "interestRate": 6.80
+      },
+      "expectedResult": "HTTP 200 OK. Mở sổ tiết kiệm kỳ hạn 12 tháng lãi suất 6.80%/năm.",
+      "uiBehavior": "Hiển thị chứng nhận mở sổ tiết kiệm online thành công."
+    },
+    {
+      "id": "TC-CUST-08",
+      "module": "CUSTOMER_PORTAL",
+      "title": "Khách hàng tra cứu Hồ sơ của tôi (/customer/my-applications)",
+      "type": "FUNCTIONAL",
+      "priority": "HIGH",
+      "role": "CUSTOMER_INDIVIDUAL",
+      "preConditions": "Có JWT Token của kh_thuha",
+      "endpoint": "GET /api/v1/customer/my-applications",
+      "headers": {
+        "Authorization": "Bearer {{customer_token}}"
+      },
+      "expectedResult": "HTTP 200 OK. Danh sách tất cả các gói vay, thẻ đã nộp kèm trạng thái (PENDING, APPROVED, REJECTED).",
+      "uiBehavior": "Bảng danh sách hồ sơ với các tag trạng thái màu sắc rõ ràng (Vàng: Chờ duyệt, Xanh lá: Đã duyệt, Đỏ: Từ chối)."
     },
     {
       "id": "TC-APPR-01",
       "module": "LOAN_APPROVAL",
-      "title": "Cán bộ Quản lý phê duyệt kiểm tra chi tiết hồ sơ vay vốn ô tô",
+      "title": "Quản lý thẩm định xem danh sách tất cả hồ sơ cần phê duyệt",
       "type": "FUNCTIONAL",
       "priority": "CRITICAL",
       "role": "MANAGER",
-      "preConditions": "Đăng nhập tài khoản ql_minhtuan, có hồ sơ mã 1001",
-      "endpoint": "GET /api/v1/approvals/applications/1001",
+      "preConditions": "Có JWT Token của ql_minhtuan",
+      "endpoint": "GET /api/v1/applications",
       "headers": {
         "Authorization": "Bearer {{manager_token}}"
       },
-      "expectedResult": "HTTP 200 OK. Trả về đầy đủ thông tin khách hàng, số tiền vay 500.000.000 VNĐ, tài sản đảm bảo chi tiết (Hãng xe, Dòng xe, Giá trị xe, Tỷ lệ vay/LTV).",
-      "uiBehavior": "Hiển thị Drawer chi tiết hồ sơ với thẻ định giá xe màu xanh lá, bảng tiến độ trả nợ dự kiến."
+      "expectedResult": "HTTP 200 OK. Danh sách hồ sơ kèm loại hồ sơ (LOAN, CAR_LOAN, CARD), số tiền yêu cầu và thông tin khách hàng.",
+      "uiBehavior": "Hiển thị bảng hồ sơ với bộ lọc theo trạng thái, tìm kiếm theo tên hoặc mã hồ sơ."
     },
     {
       "id": "TC-APPR-02",
       "module": "LOAN_APPROVAL",
-      "title": "Quản lý ra quyết định Phê duyệt giải ngân hồ sơ vay",
+      "title": "Quản lý xem chi tiết hồ sơ thẩm định kèm tài sản xe ô tô",
+      "type": "FUNCTIONAL",
+      "priority": "HIGH",
+      "role": "MANAGER",
+      "preConditions": "Có hồ sơ vay ô tô mã 1001 trong hệ thống",
+      "endpoint": "GET /api/v1/applications/1001",
+      "headers": {
+        "Authorization": "Bearer {{manager_token}}"
+      },
+      "expectedResult": "HTTP 200 OK. Chi tiết thông tin thu nhập khách hàng, định giá xe, năm sản xuất, tỷ lệ cho vay/giá trị xe (LTV).",
+      "uiBehavior": "Màn hình Drawer/Modal hiển thị chi tiết hồ sơ và các nút thao tác: Duyệt, Yêu cầu bổ sung, Từ chối."
+    },
+    {
+      "id": "TC-APPR-03",
+      "module": "LOAN_APPROVAL",
+      "title": "Quản lý ra quyết định Phê duyệt hồ sơ (APPROVED)",
       "type": "FUNCTIONAL",
       "priority": "CRITICAL",
       "role": "MANAGER",
-      "preConditions": "Hồ sơ đang ở trạng thái PENDING hoặc UNDER_REVIEW",
-      "endpoint": "POST /api/v1/approvals/applications/1001/action",
+      "preConditions": "Hồ sơ đang ở trạng thái PENDING hoặc REVIEWING",
+      "endpoint": "POST /api/v1/applications/1001/decision",
       "headers": {
         "Authorization": "Bearer {{manager_token}}"
       },
       "testData": {
         "action": "APPROVED",
-        "reasonNote": "Khách hàng có thu nhập ổn định 45 triệu/tháng, tài sản ô tô mới 100%, hồ sơ đầy đủ."
+        "reasonNote": "Hồ sơ tài chính tốt, thu nhập chuyển khoản 35 triệu/tháng, tài sản ô tô thế chấp hợp lệ."
       },
-      "expectedResult": "HTTP 200 OK. Cập nhật trạng thái hồ sơ thành 'APPROVED', lưu lịch sử phê duyệt và tên người duyệt vào audit log.",
-      "uiBehavior": "Trạng thái đổi sang tag màu xanh 'ĐÃ DUYỆT'. Gửi thông báo đến tài khoản khách hàng."
+      "expectedResult": "HTTP 200 OK. Hồ sơ chuyển sang trạng thái APPROVED, ghi log quyết định vào lịch sử thẩm định.",
+      "uiBehavior": "Hồ sơ chuyển sang trạng thái 'Đã duyệt' với Tag màu xanh lá mạ VCB, nút ra quyết định bị vô hiệu hóa."
+    },
+    {
+      "id": "TC-APPR-04",
+      "module": "LOAN_APPROVAL",
+      "title": "Quản lý yêu cầu bổ sung chứng từ (REQUEST_DOCS)",
+      "type": "FUNCTIONAL",
+      "priority": "MEDIUM",
+      "role": "MANAGER",
+      "preConditions": "Hồ sơ đang ở trạng thái PENDING",
+      "endpoint": "POST /api/v1/applications/1002/decision",
+      "headers": {
+        "Authorization": "Bearer {{manager_token}}"
+      },
+      "testData": {
+        "action": "REQUEST_DOCS",
+        "reasonNote": "Yêu cầu khách hàng nộp bổ sung hóa đơn GTGT mua xe và biên lai đóng thuế trước bạ."
+      },
+      "expectedResult": "HTTP 200 OK. Hồ sơ chuyển sang trạng thái REQUEST_DOCS, lưu ghi chú yêu cầu bổ sung.",
+      "uiBehavior": "Hiển thị trạng thái 'Yêu cầu bổ sung hồ sơ' màu cam."
+    },
+    {
+      "id": "TC-APPR-05",
+      "module": "LOAN_APPROVAL",
+      "title": "Quản lý từ chối hồ sơ (REJECTED)",
+      "type": "FUNCTIONAL",
+      "priority": "MEDIUM",
+      "role": "MANAGER",
+      "preConditions": "Hồ sơ đang ở trạng thái PENDING",
+      "endpoint": "POST /api/v1/applications/1003/decision",
+      "headers": {
+        "Authorization": "Bearer {{manager_token}}"
+      },
+      "testData": {
+        "action": "REJECTED",
+        "reasonNote": "Khách hàng có nợ chú ý nhóm 2 trên cổng tra cứu CIC, không đủ điều kiện cấp tín dụng."
+      },
+      "expectedResult": "HTTP 200 OK. Hồ sơ chuyển sang trạng thái REJECTED.",
+      "uiBehavior": "Hiển thị trạng thái 'Từ chối' màu đỏ kèm lý do từ chối."
     },
     {
       "id": "TC-STAFF-01",
       "module": "STAFF_OPERATIONS",
-      "title": "Giao dịch viên lập lệnh chuyển tiền tại quầy",
+      "title": "Giao dịch viên lấy danh sách khách hàng phục vụ tại quầy",
       "type": "FUNCTIONAL",
       "priority": "HIGH",
       "role": "STAFF",
-      "preConditions": "Tài khoản nhân viên nv_hoangnam đăng nhập thành công",
+      "preConditions": "Có JWT Token của nv_hoangnam",
+      "endpoint": "GET /api/v1/staff/customers",
+      "headers": {
+        "Authorization": "Bearer {{staff_token}}"
+      },
+      "expectedResult": "HTTP 200 OK. Trả về danh sách khách hàng phân bổ cho chi nhánh.",
+      "uiBehavior": "Bảng danh sách khách hàng với thông tin liên hệ, phân loại cá nhân/doanh nghiệp."
+    },
+    {
+      "id": "TC-STAFF-02",
+      "module": "STAFF_OPERATIONS",
+      "title": "Giao dịch viên tạo phiếu tư vấn CRM tại quầy",
+      "type": "FUNCTIONAL",
+      "priority": "HIGH",
+      "role": "STAFF",
+      "preConditions": "Có JWT Token của nv_hoangnam",
+      "endpoint": "POST /api/v1/staff/advisories",
+      "headers": {
+        "Authorization": "Bearer {{staff_token}}"
+      },
+      "testData": {
+        "customerId": 1,
+        "productType": "Cho vay mua ô tô (Car Loan)",
+        "notes": "Khách hàng quan tâm vay 500tr mua xe Toyota Camry, nhu cầu giải ngân trong tháng.",
+        "status": "FOLLOW_UP"
+      },
+      "expectedResult": "HTTP 200 OK. Tạo bản ghi tư vấn CRM mới.",
+      "uiBehavior": "Hiển thị phiếu tư vấn mới trong bảng CRM. Giao diện hiển thị rõ ràng, không bị đè chữ giữa các cột."
+    },
+    {
+      "id": "TC-STAFF-03",
+      "module": "STAFF_OPERATIONS",
+      "title": "Giao dịch viên thực hiện lệnh nộp/chuyển tiền mặt tại quầy",
+      "type": "FUNCTIONAL",
+      "priority": "CRITICAL",
+      "role": "STAFF",
+      "preConditions": "Có JWT Token của nv_hoangnam",
       "endpoint": "POST /api/v1/staff/transactions",
       "headers": {
         "Authorization": "Bearer {{staff_token}}"
       },
       "testData": {
-        "senderCustomerId": 501,
-        "receiverAccountNumber": "0011002233445",
-        "receiverName": "Vũ Đình Trọng",
-        "bankName": "INTERNAL",
+        "senderCustomerId": 1,
+        "receiverAccountNumber": "0011009988776",
+        "receiverName": "NGUYEN VAN HUONG",
+        "bankName": "VIETCOMBANK",
         "amount": 25000000,
         "fee": 0,
-        "description": "Nộp tiền mặt chuyển khoản vào tài khoản"
+        "description": "Nop tien mat thanh toan tai quay VCB"
       },
-      "expectedResult": "HTTP 200 OK. Tạo mã giao dịch TXN-20260909-01, cập nhật biến động số dư và in phiếu giao dịch.",
-      "uiBehavior": "Giao diện hiện Modal in ủy nhiệm chi / biên lai chuyển tiền thành công."
+      "expectedResult": "HTTP 200 OK. Ghi nhận giao dịch tài chính với mã giao dịch sinh tự động (TXN-...).",
+      "uiBehavior": "In biên lai giao dịch thành công, hiển thị chi tiết số tiền và người nhận."
     },
     {
-      "id": "TC-STAFF-02",
+      "id": "TC-STAFF-04",
       "module": "STAFF_OPERATIONS",
-      "title": "Tiếp nhận và giải quyết yêu cầu tra soát khiếu nại ATM",
+      "title": "Giao dịch viên xem danh sách Lịch hẹn Chatbot chi nhánh",
+      "type": "FUNCTIONAL",
+      "priority": "HIGH",
+      "role": "STAFF",
+      "preConditions": "Có JWT Token của nv_hoangnam",
+      "endpoint": "GET /api/v1/staff/appointments",
+      "headers": {
+        "Authorization": "Bearer {{staff_token}}"
+      },
+      "expectedResult": "HTTP 200 OK. Danh sách các cuộc hẹn khách đặt từ Chatbot AI, gồm ngày hẹn, khung giờ, chi nhánh và dịch vụ.",
+      "uiBehavior": "Màn hình Quản lý lịch hẹn Chatbot hiển thị danh sách, thẻ thống kê số lượng lịch Chờ tiếp nhận / Hoàn tất."
+    },
+    {
+      "id": "TC-STAFF-05",
+      "module": "STAFF_OPERATIONS",
+      "title": "Giao dịch viên tiếp nhận & hoàn tất lịch hẹn của khách",
       "type": "FUNCTIONAL",
       "priority": "MEDIUM",
       "role": "STAFF",
-      "preConditions": "Tồn tại khiếu nại chưa xử lý trong hệ thống",
-      "endpoint": "POST /api/v1/staff/disputes/1/process",
+      "preConditions": "Có cuộc hẹn trạng thái PENDING",
+      "endpoint": "PUT /api/v1/staff/appointments/1/status",
       "headers": {
         "Authorization": "Bearer {{staff_token}}"
       },
       "testData": {
-        "status": "APPROVED_REFUND",
-        "resolutionNote": "Kiểm quỹ ATM Ba Đình dư 2.000.000 VNĐ trùng khớp giờ giao dịch. Đã hoàn tiền cho khách."
+        "status": "COMPLETED"
       },
-      "expectedResult": "HTTP 200 OK. Trạng thái khiếu nại chuyển sang 'ĐÃ GIẢI QUYẾT / HOÀN TIỀN'.",
-      "uiBehavior": "Đổi màu trạng thái thành xanh, cập nhật ngày giờ hoàn tất xử lý."
+      "expectedResult": "HTTP 200 OK. Trạng thái lịch hẹn chuyển sang COMPLETED.",
+      "uiBehavior": "Tag trạng thái chuyển sang xanh lá 'Đã hoàn tất'."
     },
     {
-      "id": "TC-CMS-01",
-      "module": "FINANCIAL_RATES_CMS",
-      "title": "Cập nhật bảng Tỷ giá hối đoái ngoại tệ",
+      "id": "TC-PUB-01",
+      "module": "PUBLIC_PORTAL_CHATBOT",
+      "title": "Khách vãng lai xem Bảng Tỷ giá ngoại tệ hôm nay",
       "type": "FUNCTIONAL",
       "priority": "HIGH",
-      "role": "ADMIN",
-      "preConditions": "Có quyền DATA_MANAGE",
-      "endpoint": "POST /api/v1/data/rates/exchange-rates",
-      "headers": {
-        "Authorization": "Bearer {{admin_token}}"
-      },
-      "testData": {
-        "currencyCode": "EUR",
-        "buyRate": 27150.00,
-        "sellRate": 28650.00,
-        "transferRate": 27280.00,
-        "effectiveDate": "2026-09-09"
-      },
-      "expectedResult": "HTTP 200 OK. Dữ liệu tỷ giá EUR mới nhất được lưu và đồng bộ ra Cổng thông tin điện tử.",
-      "uiBehavior": "Bảng tỷ giá trên Cổng thông tin công khai cập nhật số liệu EUR tương ứng."
+      "role": "GUEST",
+      "preConditions": "Không cần đăng nhập",
+      "endpoint": "GET /api/v1/public/rates/exchange",
+      "expectedResult": "HTTP 200 OK. Trả về bảng tỷ giá các đồng tiền chính (USD, EUR, JPY, GBP, AUD, SGD, CNY, CAD, CHF, HKD, KRW, THB).",
+      "uiBehavior": "Bảng tỷ giá trên Cổng thông tin trang chủ hiển thị đầy đủ Giá mua tiền mặt, Mua chuyển khoản, Giá bán."
     },
     {
-      "id": "TC-WEB-01",
-      "module": "CHATBOT_PUBLIC_WEB",
-      "title": "Khách vãng lai đặt lịch hẹn giao dịch quầy qua Chatbot / Cổng điện tử",
+      "id": "TC-PUB-02",
+      "module": "PUBLIC_PORTAL_CHATBOT",
+      "title": "Khách vãng lai nộp hồ sơ vay vốn trực tuyến tại Cổng thông tin",
       "type": "FUNCTIONAL",
-      "priority": "MEDIUM",
-      "role": "PUBLIC",
-      "preConditions": "Không cần đăng nhập (Công khai)",
-      "endpoint": "POST /api/v1/portal/appointments",
+      "priority": "HIGH",
+      "role": "GUEST",
+      "preConditions": "Không cần đăng nhập",
+      "endpoint": "POST /api/v1/public/apply",
       "testData": {
-        "fullName": "Phan Nhật Nam",
-        "phoneNumber": "0909123456",
-        "branchId": 1,
-        "branchName": "VCB Chi nhánh Sở Giao dịch Hà Nội",
-        "serviceType": "Đăng ký Dịch vụ Vay mua nhà",
-        "appointmentDate": "2026-09-15",
-        "timeSlot": "14:00 - 15:00"
+        "fullName": "Phạm Thanh Tùng",
+        "idCardNumber": "024095009988",
+        "phoneNumber": "0912345678",
+        "email": "tung.pham@gmail.com",
+        "applicationType": "LOAN",
+        "requestedAmount": 300000000,
+        "note": "Cần vay tiêu dùng mở rộng kinh doanh cửa hàng bán lẻ"
       },
-      "expectedResult": "HTTP 200 OK. Sinh mã phiếu hẹn APT-2026-991, lưu vào hàng đợi tiếp đón chi nhánh.",
-      "uiBehavior": "Chatbot trả lời: 'Vietcombank đã ghi nhận lịch hẹn của Quý khách. Mã số hẹn: APT-2026-991'."
+      "expectedResult": "HTTP 201 Created. Tạo mã hồ sơ chuẩn VCB (ví dụ: VCB-2026-XXXXX) và lưu vào hệ thống thẩm định.",
+      "uiBehavior": "Nút 'Nộp hồ sơ ngay' trên Hero Banner và Header màu xanh lá mạ sáng chuẩn VCB (#73B828), bấm mở Modal nộp hồ sơ, gửi thành công hiện thông báo cảm ơn kèm mã hồ sơ."
+    },
+    {
+      "id": "TC-PUB-03",
+      "module": "PUBLIC_PORTAL_CHATBOT",
+      "title": "Khách vãng lai đặt lịch hẹn quầy giao dịch qua Chatbot AI",
+      "type": "FUNCTIONAL",
+      "priority": "HIGH",
+      "role": "GUEST",
+      "preConditions": "Không cần đăng nhập",
+      "endpoint": "POST /api/v1/public/appointments",
+      "testData": {
+        "fullName": "Hoàng Gia Bảo",
+        "phoneNumber": "0912999888",
+        "email": "giabao@gmail.com",
+        "branchName": "Chi nhánh Vietcombank Hoàn Kiếm",
+        "serviceType": "Mở tài khoản & Thẻ tín dụng cao cấp",
+        "appointmentDate": "2026-09-18",
+        "timeSlot": "09:00 - 10:00",
+        "note": "Cần tư vấn gói phát hành thẻ Visa Signature"
+      },
+      "expectedResult": "HTTP 201 Created. Lưu lịch hẹn vào bảng chatbot_appointments và hiển thị sang màn hình của Giao dịch viên.",
+      "uiBehavior": "Khung Chatbot AI phản hồi xác nhận đặt lịch hẹn thành công kèm mã số tiếp đón tại quầy."
     },
     {
       "id": "TC-REP-01",
-      "module": "AUDIT_REPORTS",
-      "title": "Xem Dashboard thống kê tổng quan tín dụng & giao dịch",
+      "module": "REPORTS_AUDIT",
+      "title": "Quản lý / Admin xem Dashboard Báo cáo thống kê tổng hợp",
       "type": "FUNCTIONAL",
       "priority": "HIGH",
       "role": "MANAGER",
-      "preConditions": "Đăng nhập bằng tài khoản Quản lý hoặc Giám đốc",
-      "endpoint": "GET /api/v1/reports/summary",
+      "preConditions": "Có JWT Token của ql_minhtuan hoặc admin_super",
+      "endpoint": "GET /api/v1/reports/dashboard",
       "headers": {
         "Authorization": "Bearer {{manager_token}}"
       },
-      "expectedResult": "HTTP 200 OK. Trả về tổng dư nợ, số lượng hồ sơ theo từng trạng thái, biểu đồ tăng trưởng.",
-      "uiBehavior": "Hiển thị 4 thẻ KPI số liệu tài chính, biểu đồ miền dư nợ và danh sách hồ sơ gần nhất."
+      "expectedResult": "HTTP 200 OK. Thống kê tổng số hồ sơ, số tiền giải ngân, tỷ lệ phê duyệt, biểu đồ phân bổ sản phẩm.",
+      "uiBehavior": "Màn hình Báo cáo hiển thị các biểu đồ trực quan, các chỉ số KPI tài chính sắc nét."
     }
   ]
 }

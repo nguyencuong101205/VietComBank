@@ -24,7 +24,7 @@ public class StaffController {
     // 0. DANH SÁCH KHÁCH HÀNG (Dùng cho dropdown / chọn trong các form)
     // =========================================================================
     @GetMapping("/customers")
-    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN') or hasAnyAuthority('STAFF_CUSTOMER_ADVISORY', 'ROLE_STAFF', 'ROLE_ADMIN')")
     public ApiResponse<List<Customer>> listAllCustomers() {
         return ApiResponse.ok(customerRepository.findAll());
     }

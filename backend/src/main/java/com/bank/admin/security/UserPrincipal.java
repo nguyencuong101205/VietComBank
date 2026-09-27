@@ -29,10 +29,23 @@ public class UserPrincipal implements UserDetails {
         this.fullName = user.getFullName();
         this.passwordHash = user.getPasswordHash();
         this.active = user.isActive();
-        this.authorities = user.getRoles().stream()
-            .flatMap(r -> r.getPermissions().stream())
-            .map(p -> new SimpleGrantedAuthority(p.getCode()))
-            .collect(Collectors.toSet());
+        java.util.Set<GrantedAuthority> auths = new java.util.HashSet<>();
+        if (user.getRoles() != null) {
+            user.getRoles().forEach(r -> {
+                String roleCode = r.getCode();
+                if (roleCode != null) {
+                    auths.add(new SimpleGrantedAuthority(roleCode.startsWith("ROLE_") ? roleCode : "ROLE_" + roleCode));
+                }
+                if (r.getPermissions() != null) {
+                    r.getPermissions().forEach(p -> {
+                        if (p.getCode() != null) {
+                            auths.add(new SimpleGrantedAuthority(p.getCode()));
+                        }
+                    });
+                }
+            });
+        }
+        this.authorities = java.util.Collections.unmodifiableSet(auths);
     }
 
     public String getAuthoritiesString() {
