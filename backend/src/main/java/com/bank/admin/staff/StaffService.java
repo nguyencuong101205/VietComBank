@@ -29,6 +29,7 @@ public class StaffService {
     private final CustomerAdvisoryRepository advisoryRepo;
     private final SupportTicketRepository ticketRepo;
     private final SupportTicketLogRepository ticketLogRepo;
+    private final SupportTicketMessageRepository ticketMessageRepo;
     private final FinancialTransactionRepository transactionRepo;
     private final CustomerRepository customerRepo;
     private final UserRepository userRepo;
@@ -221,6 +222,63 @@ public class StaffService {
         return toTicketDto(ticket);
     }
 
+    @Transactional(readOnly = true)
+    public List<TicketMessageDto> getTicketMessages(Long ticketId) {
+        if (!ticketRepo.existsById(ticketId)) {
+            throw ApiException.notFound("Không tìm thấy ticket #" + ticketId);
+        }
+        return ticketMessageRepo.findByTicketIdOrderByCreatedAtAsc(ticketId).stream()
+            .map(this::toMessageDto)
+            .toList();
+    }
+
+    @Transactional
+    @Audited(action = "SEND_TICKET_MESSAGE", module = "StaffModule", description = "Nhân viên phản hồi tin nhắn CSKH")
+    public TicketMessageDto sendStaffMessage(Long ticketId, SendTicketMessageRequest req) {
+        SupportTicket ticket = ticketRepo.findById(ticketId)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy ticket #" + ticketId));
+
+        User staff = userRepo.getReferenceById(SecurityContextUtils.currentUserId());
+
+        if (ticket.getAssignedStaff() == null) {
+            ticket.setAssignedStaff(staff);
+        }
+        if (ticket.getStatus() == SupportTicket.Status.NEW) {
+            ticket.setStatus(SupportTicket.Status.IN_PROGRESS);
+        }
+        ticketRepo.save(ticket);
+
+        SupportTicketMessage msg = SupportTicketMessage.builder()
+            .ticket(ticket)
+            .senderType(SupportTicketMessage.SenderType.STAFF)
+            .senderId(staff.getId())
+            .senderName(staff.getFullName() + " (Chuyên viên CSKH)")
+            .messageText(req.messageText().trim())
+            .build();
+        msg = ticketMessageRepo.save(msg);
+
+        SupportTicketLog logRecord = SupportTicketLog.builder()
+            .ticket(ticket)
+            .staff(staff)
+            .actionNote("Phản hồi tin nhắn: " + req.messageText().trim())
+            .build();
+        ticketLogRepo.save(logRecord);
+
+        return toMessageDto(msg);
+    }
+
+    public TicketMessageDto toMessageDto(SupportTicketMessage m) {
+        return TicketMessageDto.builder()
+            .id(m.getId())
+            .ticketId(m.getTicket().getId())
+            .senderType(m.getSenderType().name())
+            .senderId(m.getSenderId())
+            .senderName(m.getSenderName())
+            .messageText(m.getMessageText())
+            .createdAt(m.getCreatedAt())
+            .build();
+    }
+
     // =========================================================================
     // 4. GIAO DỊCH TÀI CHÍNH (FINANCIAL TRANSACTIONS)
     // =========================================================================
@@ -313,6 +371,10 @@ public class StaffService {
                 .build())
             .toList();
 
+        List<TicketMessageDto> messages = ticketMessageRepo.findByTicketIdOrderByCreatedAtAsc(t.getId()).stream()
+            .map(this::toMessageDto)
+            .toList();
+
         return TicketResponse.builder()
             .id(t.getId())
             .ticketCode(t.getTicketCode())
@@ -328,6 +390,7 @@ public class StaffService {
             .createdAt(t.getCreatedAt())
             .updatedAt(t.getUpdatedAt())
             .logs(logs)
+            .messages(messages)
             .build();
     }
 

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Alert,
+  Avatar,
   Badge,
   Button,
   Card,
@@ -14,6 +15,7 @@ import {
   Row,
   Select,
   Space,
+  Spin,
   Table,
   Tabs,
   Tag,
@@ -25,10 +27,13 @@ import {
   CustomerServiceOutlined,
   ExclamationCircleOutlined,
   FileSearchOutlined,
+  MessageOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
+  SendOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import client, { unwrap } from '../../api/client';
@@ -60,6 +65,23 @@ export default function CustomerSupportPage() {
   const [ticketForm] = Form.useForm();
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [detailTicketOpen, setDetailTicketOpen] = useState(false);
+
+  // Trò chuyện / Nhắn tin hai chiều CSKH (Two-Way Messaging)
+  const [ticketMessages, setTicketMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (detailTicketOpen) {
+      scrollToBottom();
+    }
+  }, [ticketMessages, detailTicketOpen]);
 
   useEffect(() => {
     loadDisputes();
@@ -115,21 +137,75 @@ export default function CustomerSupportPage() {
   const handleCreateTicket = async (values) => {
     setSubmittingTicket(true);
     try {
-      await unwrap(
+      const content = (values.content || values.description || '').trim();
+      const res = await unwrap(
         client.post('/customer/tickets', {
           title: values.title.trim(),
-          description: values.description.trim(),
+          content: content,
           priority: values.priority || 'MEDIUM',
         })
       );
-      message.success('Đã tạo phiếu hỗ trợ khách hàng thành công!');
+      message.success('Đã tạo phiếu hỗ trợ khách hàng thành công! Cán bộ CSKH đã tiếp nhận.');
       setCreateTicketOpen(false);
       ticketForm.resetFields();
-      loadTickets();
+      await loadTickets();
+      // Mở ngay cửa sổ trò chuyện với ticket vừa tạo
+      if (res && res.id) {
+        openTicketChat(res);
+      }
     } catch (e) {
       message.error(e.response?.data?.message || 'Không thể gửi phiếu hỗ trợ, vui lòng thử lại');
     } finally {
       setSubmittingTicket(false);
+    }
+  };
+
+  const openTicketChat = async (ticket) => {
+    setSelectedTicket(ticket);
+    setDetailTicketOpen(true);
+    setLoadingMessages(true);
+    setReplyText('');
+    try {
+      const res = await unwrap(client.get(`/customer/tickets/${ticket.id}`));
+      if (res) {
+        setSelectedTicket(res);
+        setTicketMessages(res.messages || []);
+      }
+    } catch (err) {
+      // Fallback lấy tin nhắn trực tiếp
+      try {
+        const msgs = await unwrap(client.get(`/customer/tickets/${ticket.id}/messages`));
+        setTicketMessages(Array.isArray(msgs) ? msgs : []);
+      } catch (e) {
+        setTicketMessages([]);
+      }
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!replyText || !replyText.trim() || !selectedTicket) return;
+    const msg = replyText.trim();
+    setSendingMessage(true);
+    try {
+      const newMsg = await unwrap(
+        client.post(`/customer/tickets/${selectedTicket.id}/messages`, {
+          messageText: msg,
+        })
+      );
+      setTicketMessages((prev) => [...prev, newMsg]);
+      setReplyText('');
+      message.success('Đã gửi phản hồi tới cán bộ CSKH');
+      // Nếu ticket trước đó là RESOLVED hoặc CLOSED, cập nhật trạng thái hiển thị
+      if (selectedTicket.status === 'RESOLVED' || selectedTicket.status === 'CLOSED') {
+        setSelectedTicket((prev) => ({ ...prev, status: 'IN_PROGRESS' }));
+        loadTickets();
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Không thể gửi tin nhắn, vui lòng thử lại');
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -150,10 +226,13 @@ export default function CustomerSupportPage() {
 
   const ticketStatusTag = (status) => {
     switch (status) {
+      case 'NEW':
       case 'OPEN':
-        return <Tag color="blue">Mới mở</Tag>;
+        return <Tag color="gold">Chờ CSKH tiếp nhận</Tag>;
       case 'IN_PROGRESS':
-        return <Tag color="processing">Đang hỗ trợ</Tag>;
+        return <Tag color="processing">Đang trao đổi hỗ trợ</Tag>;
+      case 'TRANSFERRED':
+        return <Tag color="purple">Chuyển tiếp kỹ thuật</Tag>;
       case 'RESOLVED':
         return <Tag color="success">Đã giải quyết</Tag>;
       case 'CLOSED':
@@ -216,13 +295,13 @@ export default function CustomerSupportPage() {
         <Button
           type="link"
           size="small"
-          style={{ color: '#005030' }}
+          style={{ color: '#005030', fontWeight: 600 }}
           onClick={() => {
             setSelectedDispute(record);
             setDetailDisputeOpen(true);
           }}
         >
-          Chi tiết
+          Chi tiết tra soát
         </Button>
       ),
     },
@@ -233,10 +312,11 @@ export default function CustomerSupportPage() {
       title: 'Mã Ticket',
       dataIndex: 'ticketCode',
       key: 'ticketCode',
+      width: 140,
       render: (code) => <Text strong style={{ color: '#005030' }}>{code}</Text>,
     },
     {
-      title: 'Tiêu đề yêu cầu',
+      title: 'Tiêu đề yêu cầu hỗ trợ',
       dataIndex: 'title',
       key: 'title',
       render: (t) => <Text strong>{t}</Text>,
@@ -245,34 +325,36 @@ export default function CustomerSupportPage() {
       title: 'Độ ưu tiên',
       dataIndex: 'priority',
       key: 'priority',
+      width: 110,
       render: (p) => priorityTag(p),
     },
     {
       title: 'Thời gian gửi',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      width: 150,
       render: (d) => (d ? dayjs(d).format('DD/MM/YYYY HH:mm') : '-'),
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
+      width: 170,
       render: (s) => ticketStatusTag(s),
     },
     {
       title: 'Thao tác',
       key: 'action',
+      width: 160,
       render: (_, record) => (
         <Button
-          type="link"
+          type="primary"
           size="small"
-          style={{ color: '#005030' }}
-          onClick={() => {
-            setSelectedTicket(record);
-            setDetailTicketOpen(true);
-          }}
+          icon={<MessageOutlined />}
+          style={{ background: '#005030', borderColor: '#005030', fontWeight: 500 }}
+          onClick={() => openTicketChat(record)}
         >
-          Chi tiết
+          Trò chuyện CSKH
         </Button>
       ),
     },
@@ -286,13 +368,13 @@ export default function CustomerSupportPage() {
           <CustomerServiceOutlined /> Trung tâm Hỗ trợ &amp; Tra soát Giao dịch
         </Title>
         <Text type="secondary">
-          Quản lý các yêu cầu tra soát khiếu nại giao dịch và phiếu hỗ trợ kỹ thuật trực tuyến 24/7 của Quý khách.
+          Kênh nhắn tin tương tác trực tiếp hai chiều với Cán bộ Chăm sóc Khách hàng Vietcombank 24/7 và gửi tra soát giao dịch trực tuyến.
         </Text>
       </div>
 
       <Alert
-        message="Cam kết chất lượng dịch vụ Vietcombank"
-        description="Mọi thắc mắc, khiếu nại giao dịch thẻ, chuyển tiền hoặc lỗi hệ thống đều được cán bộ chuyên trách tiếp nhận và phản hồi xử lý trong vòng 24 - 72 giờ làm việc. Với các tình huống khẩn cấp, vui lòng gọi Hotline 1900 54 54 13."
+        message="Cam kết dịch vụ Chăm sóc Khách hàng Vietcombank"
+        description="Quý khách có thể trao đổi nhắn tin phản hồi liên tục với nhân viên CSKH tại từng phiếu hỗ trợ. Mọi thắc mắc về thẻ, tài khoản, lỗi chuyển tiền đều được giải quyết tận tâm, minh bạch và bảo mật."
         type="info"
         showIcon
         style={{ marginBottom: 20, borderRadius: 8, borderColor: '#b7eb8f', background: '#f6ffed' }}
@@ -375,7 +457,7 @@ export default function CustomerSupportPage() {
               key: 'tickets',
               label: (
                 <span style={{ fontSize: 15, fontWeight: 600 }}>
-                  <CustomerServiceOutlined /> Phiếu hỗ trợ CSKH ({tickets.length})
+                  <CustomerServiceOutlined /> Phiếu hỗ trợ &amp; Nhắn tin CSKH ({tickets.length})
                 </span>
               ),
               children: (
@@ -465,7 +547,7 @@ export default function CustomerSupportPage() {
       <Modal
         title={
           <Space style={{ color: '#005030', fontSize: 16 }}>
-            <CustomerServiceOutlined /> Gửi phiếu hỗ trợ khách hàng
+            <CustomerServiceOutlined /> Gửi phiếu hỗ trợ khách hàng mới
           </Space>
         }
         open={createTicketOpen}
@@ -497,13 +579,13 @@ export default function CustomerSupportPage() {
           </Form.Item>
 
           <Form.Item
-            name="description"
+            name="content"
             label="Nội dung cần hỗ trợ chi tiết"
             rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
           >
             <Input.TextArea
               rows={4}
-              placeholder="Vui lòng cung cấp thêm thông tin thiết bị, số tài khoản, thông báo lỗi nếu có..."
+              placeholder="Vui lòng cung cấp chi tiết sự cố: Thiết bị đang dùng, số tài khoản, thông báo lỗi nếu có..."
             />
           </Form.Item>
 
@@ -516,7 +598,7 @@ export default function CustomerSupportPage() {
                 loading={submittingTicket}
                 style={{ background: '#005030', borderColor: '#005030', fontWeight: 600 }}
               >
-                Gửi phiếu hỗ trợ
+                Gửi phiếu & Bắt đầu trao đổi
               </Button>
             </Space>
           </Form.Item>
@@ -569,48 +651,186 @@ export default function CustomerSupportPage() {
         )}
       </Modal>
 
-      {/* MODAL: CHI TIẾT TICKET */}
+      {/* MODAL: HỘI THOẠI NHẮN TIN TRAO ĐỔI HAI CHIỀU GIỮA KHÁCH HÀNG & NHÂN VIÊN CSKH */}
       <Modal
         title={
-          <Space style={{ color: '#005030' }}>
-            <CustomerServiceOutlined /> Chi tiết Phiếu Hỗ trợ #{selectedTicket?.ticketCode}
-          </Space>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 24 }}>
+            <Space>
+              <CustomerServiceOutlined style={{ color: '#005030', fontSize: 20 }} />
+              <div>
+                <span style={{ color: '#005030', fontWeight: 600, fontSize: 16 }}>
+                  Hỗ trợ trực tuyến: #{selectedTicket?.ticketCode}
+                </span>
+                <div style={{ fontSize: 12, fontWeight: 'normal', color: '#666' }}>
+                  {selectedTicket?.title}
+                </div>
+              </div>
+            </Space>
+            <Space>
+              {selectedTicket && priorityTag(selectedTicket.priority)}
+              {selectedTicket && ticketStatusTag(selectedTicket.status)}
+            </Space>
+          </div>
         }
         open={detailTicketOpen}
         onCancel={() => setDetailTicketOpen(false)}
-        footer={[
-          <Button key="close" type="primary" style={{ background: '#005030', borderColor: '#005030' }} onClick={() => setDetailTicketOpen(false)}>
-            Đóng
-          </Button>,
-        ]}
-        width={650}
+        footer={null}
+        width={780}
+        destroyOnClose
       >
         {selectedTicket && (
-          <Descriptions bordered column={1} size="middle" style={{ marginTop: 16 }}>
-            <Descriptions.Item label="Mã Ticket">
-              <Text copyable strong>{selectedTicket.ticketCode}</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Tiêu đề">
-              <Text strong>{selectedTicket.title}</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Độ ưu tiên">
-              {priorityTag(selectedTicket.priority)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Trạng thái">
-              {ticketStatusTag(selectedTicket.status)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Thời gian gửi">
-              {dayjs(selectedTicket.createdAt).format('DD/MM/YYYY HH:mm:ss')}
-            </Descriptions.Item>
-            <Descriptions.Item label="Nội dung yêu cầu">
-              <Paragraph style={{ margin: 0, whiteSpace: 'pre-line' }}>{selectedTicket.description}</Paragraph>
-            </Descriptions.Item>
-            <Descriptions.Item label="Cán bộ phụ trách">
-              {selectedTicket.assignedStaff ? selectedTicket.assignedStaff.fullName : 'Đang phân công cán bộ CSKH'}
-            </Descriptions.Item>
-          </Descriptions>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '650px', maxHeight: '75vh' }}>
+            {/* Thanh thông tin tóm tắt phiếu hỗ trợ */}
+            <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 8, marginBottom: 12, border: '1px solid #e2e8f0', fontSize: 13 }}>
+              <Row gutter={[12, 4]} align="middle">
+                <Col span={14}>
+                  <Text type="secondary">Yêu cầu ban đầu: </Text>
+                  <Text strong>{selectedTicket.content || selectedTicket.title}</Text>
+                </Col>
+                <Col span={10} style={{ textAlign: 'right' }}>
+                  <Text type="secondary">Gửi lúc: </Text>
+                  <Text>{dayjs(selectedTicket.createdAt).format('DD/MM/YYYY HH:mm')}</Text>
+                </Col>
+              </Row>
+            </div>
+
+            {/* Khung tin nhắn hội thoại hai chiều */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '16px',
+                background: '#f4f6f8',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12,
+              }}
+            >
+              {loadingMessages ? (
+                <div style={{ textAlign: 'center', padding: '50px 0' }}>
+                  <Spin tip="Đang tải lịch sử trao đổi..." />
+                </div>
+              ) : ticketMessages.length === 0 ? (
+                <Empty description="Chưa có tin nhắn nào trong hội thoại này" />
+              ) : (
+                ticketMessages.map((msg, idx) => {
+                  const isCustomer = msg.senderType === 'CUSTOMER';
+                  return (
+                    <div
+                      key={msg.id || idx}
+                      style={{
+                        display: 'flex',
+                        flexDirection: isCustomer ? 'row-reverse' : 'row',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                      }}
+                    >
+                      <Avatar
+                        style={{
+                          backgroundColor: isCustomer ? '#005030' : '#1890ff',
+                          flexShrink: 0,
+                        }}
+                        icon={isCustomer ? <UserOutlined /> : <CustomerServiceOutlined />}
+                      />
+                      <div
+                        style={{
+                          maxWidth: '75%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: isCustomer ? 'flex-end' : 'flex-start',
+                        }}
+                      >
+                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>
+                          <span style={{ fontWeight: 600, color: isCustomer ? '#005030' : '#1e3a8a' }}>
+                            {isCustomer ? 'Quý khách (Bạn)' : msg.senderName}
+                          </span>
+                          {!isCustomer && (
+                            <Tag color="cyan" style={{ fontSize: 10, marginLeft: 6, lineHeight: '16px', padding: '0 4px' }}>
+                              Cán bộ CSKH
+                            </Tag>
+                          )}
+                          <span style={{ marginLeft: 8 }}>
+                            {msg.createdAt ? dayjs(msg.createdAt).format('HH:mm DD/MM') : ''}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            padding: '10px 14px',
+                            borderRadius: isCustomer ? '14px 2px 14px 14px' : '2px 14px 14px 14px',
+                            background: isCustomer ? '#005030' : '#ffffff',
+                            color: isCustomer ? '#ffffff' : '#1f2937',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                            fontSize: 14,
+                            lineHeight: 1.5,
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {msg.messageText}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Khung soạn thảo và gửi tin nhắn phản hồi */}
+            <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Input.TextArea
+                  rows={2}
+                  placeholder="Nhập nội dung phản hồi, trao đổi trực tiếp với nhân viên CSKH (Nhấn Gửi hoặc Ctrl+Enter)..."
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  style={{ borderRadius: 8, resize: 'none' }}
+                />
+                <Button
+                  type="primary"
+                  icon={<SendOutlined />}
+                  loading={sendingMessage}
+                  disabled={!replyText.trim()}
+                  onClick={handleSendMessage}
+                  style={{
+                    height: 'auto',
+                    padding: '0 20px',
+                    background: '#005030',
+                    borderColor: '#005030',
+                    fontWeight: 600,
+                    borderRadius: 8,
+                  }}
+                >
+                  Gửi
+                </Button>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  💡 Gợi ý: Gõ tin nhắn và nhấn <b>Ctrl+Enter</b> để gửi nhanh.
+                </Text>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<ReloadOutlined />}
+                  onClick={() => openTicketChat(selectedTicket)}
+                  style={{ color: '#005030' }}
+                >
+                  Tải lại tin nhắn
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </Modal>
     </div>
   );
 }
+

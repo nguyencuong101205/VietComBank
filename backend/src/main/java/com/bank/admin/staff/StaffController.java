@@ -131,6 +131,21 @@ public class StaffController {
         return ApiResponse.ok("Cập nhật tiến độ hỗ trợ CSKH thành công", staffService.processTicket(id, req));
     }
 
+    @GetMapping("/tickets/{id}/messages")
+    @PreAuthorize("hasAnyAuthority('STAFF_SUPPORT_TICKET', 'ROLE_ADMIN')")
+    public ApiResponse<List<TicketMessageDto>> getTicketMessages(@PathVariable Long id) {
+        return ApiResponse.ok(staffService.getTicketMessages(id));
+    }
+
+    @PostMapping("/tickets/{id}/messages")
+    @PreAuthorize("hasAnyAuthority('STAFF_SUPPORT_TICKET', 'ROLE_ADMIN')")
+    public ApiResponse<TicketMessageDto> sendStaffMessage(
+            @PathVariable Long id,
+            @Valid @RequestBody SendTicketMessageRequest req
+    ) {
+        return ApiResponse.ok("Đã gửi tin nhắn phản hồi tới khách hàng", staffService.sendStaffMessage(id, req));
+    }
+
     // =========================================================================
     // 4. GIAO DỊCH TÀI CHÍNH (FINANCIAL TRANSACTIONS)
     // =========================================================================

@@ -255,6 +255,44 @@ async function runAllTests() {
 
   console.log('');
 
+  // ================= 5B. CHĂM SÓC KHÁCH HÀNG & NHẮN TIN HAI CHIỀU =================
+  console.log('📌 5B. KIỂM THỬ NHẮN TIN TRAO ĐỔI HAI CHIỀU GIỮA KHÁCH HÀNG VÀ NHÂN VIÊN CSKH');
+
+  // 5B.1 Khách hàng tạo ticket hỗ trợ mới
+  res = await request('POST', '/customer/tickets', {
+    title: 'Hỗ trợ mở khóa tài khoản Digibank do nhập sai mã PIN',
+    content: 'Tôi nhập sai mã PIN thẻ ATM 3 lần tại cây, hiện ứng dụng Digibank cũng báo khóa tạm thời.',
+    priority: 'HIGH'
+  }, tokens.customer);
+  const createdTicket = res.data?.data;
+  const cskhTicketId = createdTicket?.id;
+  recordResult('TC-CSKH-01', 'Khách hàng tạo Ticket hỗ trợ mới kèm tin nhắn mở đầu', 'CSKH', res.status === 200 && !!cskhTicketId, res.status, `Mã: ${createdTicket?.ticketCode}`);
+
+  // 5B.2 Khách hàng gửi thêm tin nhắn bổ sung
+  res = await request('POST', `/customer/tickets/${cskhTicketId}/messages`, {
+    messageText: 'Tôi vừa gửi ảnh chụp mặt trước thẻ CCCD qua email hỗ trợ của ngân hàng rồi ạ.'
+  }, tokens.customer);
+  recordResult('TC-CSKH-02', 'Khách hàng gửi tin nhắn phản hồi trao đổi trong ticket', 'CSKH', res.status === 200, res.status, res.data?.data?.messageText?.substring(0, 35) + '...');
+
+  // 5B.3 Nhân viên CSKH xem danh sách tin nhắn của ticket
+  res = await request('GET', `/staff/tickets/${cskhTicketId}/messages`, null, tokens.staff);
+  const staffReadMsgs = res.data?.data || [];
+  recordResult('TC-CSKH-03', 'Nhân viên CSKH đọc lịch sử tin nhắn trao đổi của ticket', 'CSKH', res.status === 200 && staffReadMsgs.length >= 2, res.status, `Số tin nhắn: ${staffReadMsgs.length}`);
+
+  // 5B.4 Nhân viên CSKH gửi tin nhắn phản hồi cho khách hàng
+  res = await request('POST', `/staff/tickets/${cskhTicketId}/messages`, {
+    messageText: 'Chào anh/chị, em là Nam - cán bộ CSKH đã tiếp nhận và vừa mở khóa thẻ thành công trên hệ thống rồi ạ.'
+  }, tokens.staff);
+  recordResult('TC-CSKH-04', 'Nhân viên CSKH gửi tin nhắn giải đáp/phản hồi tới khách hàng', 'CSKH', res.status === 200, res.status, res.data?.data?.messageText?.substring(0, 35) + '...');
+
+  // 5B.5 Khách hàng đọc lại toàn bộ chi tiết ticket kèm chuỗi tin nhắn hai chiều
+  res = await request('GET', `/customer/tickets/${cskhTicketId}`, null, tokens.customer);
+  const fullTicket = res.data?.data;
+  const fullMsgs = fullTicket?.messages || [];
+  recordResult('TC-CSKH-05', 'Khách hàng xem chuỗi hội thoại hai chiều hoàn chỉnh (3 tin nhắn)', 'CSKH', res.status === 200 && fullMsgs.length >= 3, res.status, `Hội thoại: ${fullMsgs.length} tin`);
+
+  console.log('');
+
   // ================= 6. PUBLIC PORTAL & CHATBOT =================
   console.log('📌 6. KIỂM THỬ CỔNG THÔNG TIN & CHATBOT CÔNG KHAI (KHÔNG CẦN LOGIN)');
 

@@ -86,6 +86,21 @@ public final class StaffDtos {
         @NotBlank(message = "Nội dung xử lý không được để trống") String actionNote
     ) {}
 
+    public record SendTicketMessageRequest(
+        @NotBlank(message = "Nội dung tin nhắn không được để trống") String messageText
+    ) {}
+
+    @Builder
+    public record TicketMessageDto(
+        Long id,
+        Long ticketId,
+        String senderType, // CUSTOMER, STAFF
+        Long senderId,
+        String senderName,
+        String messageText,
+        Instant createdAt
+    ) {}
+
     @Builder
     public record TicketLogDto(
         Long id,
@@ -109,7 +124,8 @@ public final class StaffDtos {
         String status,
         Instant createdAt,
         Instant updatedAt,
-        List<TicketLogDto> logs
+        List<TicketLogDto> logs,
+        List<TicketMessageDto> messages
     ) {}
 
     // ================= 4. FINANCIAL TRANSACTION DTOS =================

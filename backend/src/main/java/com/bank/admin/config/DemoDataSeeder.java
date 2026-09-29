@@ -42,6 +42,8 @@ public class DemoDataSeeder {
                                    RoleRepository roleRepository,
                                    PermissionRepository permissionRepository,
                                    com.bank.admin.staff.ChatbotAppointmentRepository appointmentRepository,
+                                   com.bank.admin.staff.SupportTicketRepository ticketRepository,
+                                   com.bank.admin.staff.SupportTicketMessageRepository ticketMessageRepository,
                                    org.springframework.jdbc.core.JdbcTemplate jdbcTemplate,
                                    PasswordEncoder passwordEncoder,
                                    @org.springframework.beans.factory.annotation.Value("${app.security.otp-dev-mode}") boolean otpDevMode,
@@ -197,6 +199,88 @@ public class DemoDataSeeder {
                 }
             } catch (Exception ex) {
                 log.warn("Không thể khởi tạo dữ liệu mẫu lịch hẹn: {}", ex.getMessage());
+            }
+
+            // Đảm bảo bảng support_ticket_messages tồn tại & seed hội thoại mẫu
+            try {
+                jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS support_ticket_messages (
+                        message_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                        ticket_id BIGINT NOT NULL,
+                        sender_type VARCHAR(20) NOT NULL,
+                        sender_id BIGINT NOT NULL,
+                        sender_name VARCHAR(150) NOT NULL,
+                        message_text TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        INDEX idx_stm_ticket (ticket_id),
+                        INDEX idx_stm_created (created_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """);
+
+                if (ticketMessageRepository.count() == 0) {
+                    var tickets = ticketRepository.findAll();
+                    var sampleMessages = new java.util.ArrayList<com.bank.admin.staff.SupportTicketMessage>();
+
+                    for (var t : tickets) {
+                        Long custId = 501L;
+                        String custName = "Khách hàng";
+                        try {
+                            var custRows = jdbcTemplate.queryForList(
+                                "SELECT c.customer_id, c.full_name FROM support_tickets t JOIN customers c ON t.customer_id = c.customer_id WHERE t.ticket_id = ?",
+                                t.getId());
+                            if (!custRows.isEmpty()) {
+                                custId = ((Number) custRows.get(0).get("customer_id")).longValue();
+                                custName = (String) custRows.get(0).get("full_name");
+                            }
+                        } catch (Exception ignored) {}
+
+                        // Tin nhắn 1: Khách hàng mở đầu ticket
+                        sampleMessages.add(com.bank.admin.staff.SupportTicketMessage.builder()
+                            .ticket(t)
+                            .senderType(com.bank.admin.staff.SupportTicketMessage.SenderType.CUSTOMER)
+                            .senderId(custId)
+                            .senderName(custName)
+                            .messageText(t.getContent() != null && !t.getContent().isBlank() ? t.getContent() : "Chào Vietcombank, tôi cần hỗ trợ về dịch vụ tài khoản.")
+                            .build());
+
+                        // Tin nhắn 2: Nhân viên tiếp nhận & phản hồi
+                        if (t.getStatus() != com.bank.admin.staff.SupportTicket.Status.NEW) {
+                            sampleMessages.add(com.bank.admin.staff.SupportTicketMessage.builder()
+                                .ticket(t)
+                                .senderType(com.bank.admin.staff.SupportTicketMessage.SenderType.STAFF)
+                                .senderId(103L)
+                                .senderName("Nguyễn Hoàng Nam (Chuyên viên CSKH)")
+                                .messageText("Kính chào Quý khách! Vietcombank đã tiếp nhận yêu cầu hỗ trợ #" + t.getTicketCode() + ". Em là Hoàng Nam, chuyên viên chăm sóc khách hàng. Em đang kiểm tra dữ liệu trên hệ thống để hỗ trợ Quý khách ngay đây ạ.")
+                                .build());
+                        }
+
+                        // Tin nhắn 3 & 4: Giải quyết hoàn tất
+                        if (t.getStatus() == com.bank.admin.staff.SupportTicket.Status.RESOLVED || t.getStatus() == com.bank.admin.staff.SupportTicket.Status.CLOSED) {
+                            sampleMessages.add(com.bank.admin.staff.SupportTicketMessage.builder()
+                                .ticket(t)
+                                .senderType(com.bank.admin.staff.SupportTicketMessage.SenderType.STAFF)
+                                .senderId(103L)
+                                .senderName("Nguyễn Hoàng Nam (Chuyên viên CSKH)")
+                                .messageText("Em đã hoàn tất xử lý yêu cầu cho Quý khách trên hệ thống. Quý khách vui lòng thử đăng nhập lại ứng dụng VCB Digibank và kiểm tra nhé ạ.")
+                                .build());
+
+                            sampleMessages.add(com.bank.admin.staff.SupportTicketMessage.builder()
+                                .ticket(t)
+                                .senderType(com.bank.admin.staff.SupportTicketMessage.SenderType.CUSTOMER)
+                                .senderId(custId)
+                                .senderName(custName)
+                                .messageText("Dạ vâng, tôi vừa kiểm tra và đã sử dụng được bình thường rồi. Cảm ơn cán bộ và Vietcombank đã hỗ trợ rất nhanh và nhiệt tình ạ!")
+                                .build());
+                        }
+                    }
+
+                    if (!sampleMessages.isEmpty()) {
+                        ticketMessageRepository.saveAll(sampleMessages);
+                        log.info("Đã tạo {} tin nhắn mẫu trao đổi CSKH giữa khách hàng và nhân viên", sampleMessages.size());
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Không thể khởi tạo bảng hoặc dữ liệu mẫu support_ticket_messages: {}", ex.getMessage());
             }
 
             log.info("Demo data ready. Dev accounts: admin_super/Admin@123, ql_minhtuan/Manager@123, nv_hoangnam/Staff@123 (otpDevMode={})", otpDevMode);

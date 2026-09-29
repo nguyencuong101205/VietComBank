@@ -152,6 +152,10 @@ public final class CustomerDtos {
         String priority
     ) {}
 
+    public record SendCustomerTicketMessageRequest(
+        @NotBlank(message = "Nội dung tin nhắn không được để trống") String messageText
+    ) {}
+
     @Builder
     public record CustomerTicketResponse(
         Long id,
@@ -161,7 +165,8 @@ public final class CustomerDtos {
         String priority,
         String status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        List<com.bank.admin.staff.dto.StaffDtos.TicketMessageDto> messages
     ) {}
 
     // ==========================================

@@ -31,6 +31,7 @@ public class CustomerTransactionController {
     private final CustomerRepository customerRepo;
     private final DisputeRequestRepository disputeRepo;
     private final SupportTicketRepository ticketRepo;
+    private final com.bank.admin.staff.SupportTicketMessageRepository ticketMessageRepo;
     private final UserRepository userRepo;
 
     /**
@@ -213,6 +214,17 @@ public class CustomerTransactionController {
             .status(SupportTicket.Status.NEW)
             .build();
         ticket = ticketRepo.save(ticket);
+
+        // Lưu tin nhắn mở đầu của khách hàng vào luồng hội thoại
+        com.bank.admin.staff.SupportTicketMessage initialMsg = com.bank.admin.staff.SupportTicketMessage.builder()
+            .ticket(ticket)
+            .senderType(com.bank.admin.staff.SupportTicketMessage.SenderType.CUSTOMER)
+            .senderId(customer.getId())
+            .senderName(customer.getFullName())
+            .messageText(ticket.getContent())
+            .build();
+        ticketMessageRepo.save(initialMsg);
+
         log.info("Khách hàng {} đã tạo ticket hỗ trợ {}", customer.getFullName(), code);
 
         return ApiResponse.ok("Tạo yêu cầu hỗ trợ thành công", CustomerTicketResponse.builder()
@@ -224,6 +236,127 @@ public class CustomerTransactionController {
             .status(ticket.getStatus().name())
             .createdAt(ticket.getCreatedAt())
             .updatedAt(ticket.getUpdatedAt())
+            .messages(java.util.List.of(com.bank.admin.staff.dto.StaffDtos.TicketMessageDto.builder()
+                .id(initialMsg.getId())
+                .ticketId(ticket.getId())
+                .senderType(initialMsg.getSenderType().name())
+                .senderId(initialMsg.getSenderId())
+                .senderName(initialMsg.getSenderName())
+                .messageText(initialMsg.getMessageText())
+                .createdAt(initialMsg.getCreatedAt())
+                .build()))
+            .build());
+    }
+
+    /**
+     * 6.1. Chi tiết phiếu hỗ trợ kèm luồng tin nhắn trao đổi hai chiều
+     */
+    @GetMapping("/tickets/{id}")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE')")
+    public ApiResponse<CustomerTicketResponse> getCustomerTicketDetail(@PathVariable Long id) {
+        Long customerId = SecurityContextUtils.currentCustomerId();
+        SupportTicket t = ticketRepo.findById(id)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiếu hỗ trợ #" + id));
+        if (!t.getCustomer().getId().equals(customerId)) {
+            throw ApiException.forbidden("Bạn không có quyền truy cập phiếu hỗ trợ này");
+        }
+
+        List<com.bank.admin.staff.dto.StaffDtos.TicketMessageDto> messages = ticketMessageRepo.findByTicketIdOrderByCreatedAtAsc(t.getId()).stream()
+            .map(m -> com.bank.admin.staff.dto.StaffDtos.TicketMessageDto.builder()
+                .id(m.getId())
+                .ticketId(m.getTicket().getId())
+                .senderType(m.getSenderType().name())
+                .senderId(m.getSenderId())
+                .senderName(m.getSenderName())
+                .messageText(m.getMessageText())
+                .createdAt(m.getCreatedAt())
+                .build())
+            .toList();
+
+        return ApiResponse.ok(CustomerTicketResponse.builder()
+            .id(t.getId())
+            .ticketCode(t.getTicketCode())
+            .title(t.getTitle())
+            .content(t.getContent())
+            .priority(t.getPriority().name())
+            .status(t.getStatus().name())
+            .createdAt(t.getCreatedAt())
+            .updatedAt(t.getUpdatedAt())
+            .messages(messages)
+            .build());
+    }
+
+    /**
+     * 6.2. Danh sách tin nhắn trao đổi của một ticket
+     */
+    @GetMapping("/tickets/{id}/messages")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE')")
+    public ApiResponse<List<com.bank.admin.staff.dto.StaffDtos.TicketMessageDto>> getCustomerTicketMessages(@PathVariable Long id) {
+        Long customerId = SecurityContextUtils.currentCustomerId();
+        SupportTicket t = ticketRepo.findById(id)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiếu hỗ trợ #" + id));
+        if (!t.getCustomer().getId().equals(customerId)) {
+            throw ApiException.forbidden("Bạn không có quyền truy cập phiếu hỗ trợ này");
+        }
+
+        List<com.bank.admin.staff.dto.StaffDtos.TicketMessageDto> messages = ticketMessageRepo.findByTicketIdOrderByCreatedAtAsc(t.getId()).stream()
+            .map(m -> com.bank.admin.staff.dto.StaffDtos.TicketMessageDto.builder()
+                .id(m.getId())
+                .ticketId(m.getTicket().getId())
+                .senderType(m.getSenderType().name())
+                .senderId(m.getSenderId())
+                .senderName(m.getSenderName())
+                .messageText(m.getMessageText())
+                .createdAt(m.getCreatedAt())
+                .build())
+            .toList();
+        return ApiResponse.ok(messages);
+    }
+
+    /**
+     * 6.3. Khách hàng gửi tin nhắn trao đổi tới nhân viên CSKH
+     */
+    @PostMapping("/tickets/{id}/messages")
+    @Transactional
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE')")
+    public ApiResponse<com.bank.admin.staff.dto.StaffDtos.TicketMessageDto> sendCustomerMessage(
+            @PathVariable Long id,
+            @Valid @RequestBody SendCustomerTicketMessageRequest req) {
+        Long customerId = SecurityContextUtils.currentCustomerId();
+        SupportTicket t = ticketRepo.findById(id)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy phiếu hỗ trợ #" + id));
+        if (!t.getCustomer().getId().equals(customerId)) {
+            throw ApiException.forbidden("Bạn không có quyền gửi tin nhắn cho phiếu hỗ trợ này");
+        }
+
+        Customer customer = customerRepo.findById(customerId)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy thông tin khách hàng"));
+
+        // Khi khách hàng gửi tin nhắn phản hồi, nếu ticket đang NEW hoặc CLOSED/RESOLVED, mở lại trạng thái IN_PROGRESS
+        if (t.getStatus() == SupportTicket.Status.RESOLVED || t.getStatus() == SupportTicket.Status.CLOSED) {
+            t.setStatus(SupportTicket.Status.IN_PROGRESS);
+            ticketRepo.save(t);
+        }
+
+        com.bank.admin.staff.SupportTicketMessage msg = com.bank.admin.staff.SupportTicketMessage.builder()
+            .ticket(t)
+            .senderType(com.bank.admin.staff.SupportTicketMessage.SenderType.CUSTOMER)
+            .senderId(customer.getId())
+            .senderName(customer.getFullName())
+            .messageText(req.messageText().trim())
+            .build();
+        msg = ticketMessageRepo.save(msg);
+
+        log.info("Khách hàng {} gửi tin nhắn trao đổi trong ticket {}", customer.getFullName(), t.getTicketCode());
+
+        return ApiResponse.ok("Gửi tin nhắn trao đổi thành công", com.bank.admin.staff.dto.StaffDtos.TicketMessageDto.builder()
+            .id(msg.getId())
+            .ticketId(t.getId())
+            .senderType(msg.getSenderType().name())
+            .senderId(msg.getSenderId())
+            .senderName(msg.getSenderName())
+            .messageText(msg.getMessageText())
+            .createdAt(msg.getCreatedAt())
             .build());
     }
 
