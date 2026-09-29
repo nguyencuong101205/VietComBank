@@ -109,6 +109,18 @@ async function runAllTests() {
   res = await request('GET', '/system/roles/permissions', null, tokens.admin);
   recordResult('TC-RBAC-06', '[PASS] Admin xem danh mục toàn bộ Quyền hạn (Permissions)', 'RBAC', res.status === 200, res.status);
 
+  // 2.7 Manager -> Rates (MUST BE 403 Forbidden)
+  res = await request('GET', '/exchange-rates', null, tokens.manager);
+  recordResult('TC-RBAC-07', '[SECURITY] Quản lý gọi API Dữ liệu Tỷ giá -> Chặn 403 Forbidden', 'RBAC', res.status === 403, res.status);
+
+  // 2.8 Staff -> Reports (MUST BE 403 Forbidden)
+  res = await request('GET', '/reports/dashboard', null, tokens.staff);
+  recordResult('TC-RBAC-08', '[SECURITY] Giao dịch viên gọi API Báo cáo & Thống kê -> Chặn 403 Forbidden', 'RBAC', res.status === 403, res.status);
+
+  // 2.9 Staff -> Rates (MUST BE 403 Forbidden)
+  res = await request('GET', '/exchange-rates', null, tokens.staff);
+  recordResult('TC-RBAC-09', '[SECURITY] Giao dịch viên gọi API Dữ liệu Tỷ giá -> Chặn 403 Forbidden', 'RBAC', res.status === 403, res.status);
+
   console.log('');
 
   // ================= 3. CUSTOMER PORTAL =================

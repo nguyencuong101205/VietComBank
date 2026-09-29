@@ -70,7 +70,7 @@ export default function MainLayout({ children }) {
     { key: '/approvals', icon: <FileDoneOutlined />, label: t('admin.menuApprovals'), permission: ['APPROVE_LOAN'] },
     { type: 'group', label: t('admin.groupReports'), permission: ['REPORT_EXPORT'] },
     { key: '/reports/dashboard', icon: <FundOutlined />, label: t('admin.menuReports'), permission: ['REPORT_EXPORT'] },
-    { type: 'group', label: t('admin.groupSystem'), permission: [] },
+    { type: 'group', label: t('admin.groupSystem'), permission: ['SYS_MANAGE_USERS'] },
     { key: '/system/users', icon: <TeamOutlined />, label: t('admin.menuUsers'), permission: ['SYS_MANAGE_USERS'] },
     { key: '/system/audit-logs', icon: <HistoryOutlined />, label: t('admin.menuAuditLogs'), permission: ['SYS_MANAGE_USERS'] },
     { type: 'group', label: t('admin.groupCms'), permission: ['CMS_MANAGE_POST'] },
@@ -103,7 +103,7 @@ export default function MainLayout({ children }) {
       if (stored?.roles?.includes('ROLE_ADMIN')) return true;
       return stored?.permissions?.some((p) => required.includes(p)) ?? false;
     }
-  }, []);
+  }, [user, t]);
 
   const selectedKey = window.location.hash.replace('#', '') || '/';
 

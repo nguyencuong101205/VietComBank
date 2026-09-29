@@ -22,10 +22,11 @@ INSERT INTO permissions (permission_id, permission_code, permission_name, module
 (9, 'STAFF_FINANCIAL_TX', 'Thực hiện giao dịch tài chính', 'StaffModule')
 ON DUPLICATE KEY UPDATE permission_name=VALUES(permission_name), module_name=VALUES(module_name);
 
-INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES
+DELETE FROM role_permissions;
+INSERT INTO role_permissions (role_id, permission_id) VALUES
 (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), -- Admin full
-(2, 2), (2, 3), (2, 4),                                                 -- Manager (DATA_UPDATE_RATES, APPROVE_LOAN, REPORT_EXPORT)
-(3, 2), (3, 4), (3, 6), (3, 7), (3, 8), (3, 9);                         -- Staff (DATA_UPDATE_RATES, REPORT_EXPORT, Staff Modules)
+(2, 3), (2, 4),                                                         -- Manager: APPROVE_LOAN (3), REPORT_EXPORT (4)
+(3, 6), (3, 7), (3, 8), (3, 9);                                         -- Staff: CRM (6), Ticket (7), Dispute (8), Financial Tx (9)
 
 INSERT INTO users (user_id, username, password_hash, email, full_name, phone_number, status) VALUES
 (101, 'admin_super', '$2a$12$eImiTXuWVxfM37uY4JANjOL.8/OHq8pM.a3T28eGv6g3u1r123456', 'admin@bank.com', 'Nguyễn Văn Admin', '0901234567', 'ACTIVE'),
