@@ -10,6 +10,8 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
 
     boolean existsByApplicationCode(String applicationCode);
 
+    java.util.Optional<Application> findByApplicationCode(String applicationCode);
+
     /**
      * Tìm kiếm hồ sơ: mã hồ sơ/tên KH, loại, trạng thái.
      * Sắp mặc định: PENDING/DOCS_REQUIRED (cần xử lý) lên trước theo updated_at.

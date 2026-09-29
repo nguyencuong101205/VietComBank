@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -26,6 +26,7 @@ import client, { unwrap } from '../api/client';
 import { useAuth } from '../store/AuthContext';
 import { useLanguage } from '../store/LanguageContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import VisualCaptcha from '../components/VisualCaptcha';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -43,8 +44,21 @@ export default function LoginPage() {
   const [step1, setStep1] = useState(null); // { username, tempToken, devOtp, maskedEmail }
   const [form] = Form.useForm();
   const [otpForm] = Form.useForm();
+  const captchaRef = useRef(null);
 
-  const onPasswordSubmit = async ({ username, password }) => {
+  const onPasswordSubmit = async ({ username, password, captcha }) => {
+    // Kiểm tra Captcha chống bot
+    const expected = captchaRef.current?.getCode()?.toUpperCase();
+    if (!expected || captcha?.trim().toUpperCase() !== expected) {
+      message.error(
+        lang === 'vi'
+          ? 'Mã kiểm tra chống bot không chính xác! Vui lòng nhập lại.'
+          : 'Security captcha is incorrect. Please try again!'
+      );
+      captchaRef.current?.refresh();
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await unwrap(client.post('/auth/login', { username, password }));
@@ -60,6 +74,7 @@ export default function LoginPage() {
         );
       }
     } catch (err) {
+      captchaRef.current?.refresh();
       message.error(extractError(err));
     } finally {
       setLoading(false);
@@ -113,9 +128,11 @@ export default function LoginPage() {
   };
 
   const fillQuickAccount = (username, pass) => {
+    const code = captchaRef.current?.getCode() || '';
     form.setFieldsValue({
       username,
       password: pass,
+      captcha: code,
     });
     message.success(
       lang === 'vi'
@@ -362,6 +379,28 @@ export default function LoginPage() {
                       size="large"
                       style={{ borderRadius: 8 }}
                     />
+                  </Form.Item>
+
+                  {/* Visual Captcha */}
+                  <Form.Item
+                    name="captcha"
+                    label={
+                      <span style={{ fontWeight: 600, fontSize: 13, color: '#1C252E' }}>
+                        {lang === 'vi' ? 'Mã kiểm tra bảo mật' : 'Security Code'}
+                      </span>
+                    }
+                    rules={[{ required: true, message: lang === 'vi' ? 'Vui lòng nhập mã bảo mật' : 'Please enter security code' }]}
+                  >
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <Input
+                        prefix={<SafetyOutlined style={{ color: '#00482B', marginRight: 4 }} />}
+                        placeholder={lang === 'vi' ? 'Nhập mã bên cạnh' : 'Enter code'}
+                        size="large"
+                        maxLength={6}
+                        style={{ borderRadius: 8, textTransform: 'uppercase', letterSpacing: 2, fontWeight: 700 }}
+                      />
+                      <VisualCaptcha ref={captchaRef} width={120} height={40} />
+                    </div>
                   </Form.Item>
 
                   <Button

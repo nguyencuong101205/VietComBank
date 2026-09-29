@@ -25,6 +25,7 @@ import AdvisoriesPage from './pages/staff/AdvisoriesPage';
 import SupportTicketsPage from './pages/staff/SupportTicketsPage';
 import FinancialTransactionsPage from './pages/staff/FinancialTransactionsPage';
 import AppointmentsPage from './pages/staff/AppointmentsPage';
+import ContactsManagementPage from './pages/staff/ContactsManagementPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
 // Customer Portal Pages
@@ -40,6 +41,8 @@ import BusinessLoanPage from './pages/customer/BusinessLoanPage';
 import TradeFinancePage from './pages/customer/TradeFinancePage';
 import CashFlowPage from './pages/customer/CashFlowPage';
 import CustomerTransactionsPage from './pages/customer/CustomerTransactionsPage';
+import CustomerSupportPage from './pages/customer/CustomerSupportPage';
+import PayrollServicePage from './pages/customer/PayrollServicePage';
 
 /** Route yêu cầu đăng nhập nội bộ (Admin/Manager/Staff) kèm kiểm tra quyền hạn (RBAC). */
 function ProtectedAdmin({ children, permissions = [] }) {
@@ -105,7 +108,9 @@ export default function App() {
               <Route path="/customer/loans/business" element={<ProtectedCustomer><BusinessLoanPage /></ProtectedCustomer>} />
               <Route path="/customer/trade-finance" element={<ProtectedCustomer><TradeFinancePage /></ProtectedCustomer>} />
               <Route path="/customer/cash-flow" element={<ProtectedCustomer><CashFlowPage /></ProtectedCustomer>} />
+              <Route path="/customer/payroll" element={<ProtectedCustomer><PayrollServicePage /></ProtectedCustomer>} />
               <Route path="/customer/transactions" element={<ProtectedCustomer><CustomerTransactionsPage /></ProtectedCustomer>} />
+              <Route path="/customer/support" element={<ProtectedCustomer><CustomerSupportPage /></ProtectedCustomer>} />
 
               {/* Bảng điều khiển quản trị (Mọi người dùng nội bộ đều có thể xem) */}
               <Route path="/" element={<ProtectedAdmin><DashboardPage /></ProtectedAdmin>} />
@@ -115,6 +120,7 @@ export default function App() {
               <Route path="/staff/advisories" element={<ProtectedAdmin permissions={['STAFF_CUSTOMER_ADVISORY']}><AdvisoriesPage /></ProtectedAdmin>} />
               <Route path="/staff/disputes" element={<ProtectedAdmin permissions={['STAFF_DISPUTE_HANDLE']}><DisputesPage /></ProtectedAdmin>} />
               <Route path="/staff/tickets" element={<ProtectedAdmin permissions={['STAFF_SUPPORT_TICKET']}><SupportTicketsPage /></ProtectedAdmin>} />
+              <Route path="/staff/contacts" element={<ProtectedAdmin permissions={['STAFF_SUPPORT_TICKET']}><ContactsManagementPage /></ProtectedAdmin>} />
               <Route path="/staff/transactions" element={<ProtectedAdmin permissions={['STAFF_FINANCIAL_TX']}><FinancialTransactionsPage /></ProtectedAdmin>} />
 
               {/* Module 2: Dữ liệu biến động (Chỉ người có quyền DATA_UPDATE_RATES) */}

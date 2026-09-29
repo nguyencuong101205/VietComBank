@@ -48,10 +48,13 @@ public class SecurityConfig {
                 // Xác thực & Public API cho Cổng thông tin Vietcombank & Khách hàng
                 .requestMatchers("/api/v1/auth/login", "/api/v1/auth/verify-otp",
                                  "/api/v1/auth/resend-otp", "/api/v1/auth/refresh",
-                                 "/api/v1/customer/auth/login", "/api/customer/auth/login",
-                                 "/api/v1/customer/auth/register", "/api/customer/auth/register",
+                                 "/api/v1/customer/auth/**", "/api/customer/auth/**",
                                  "/api/v1/customer/login", "/api/customer/login",
+                                 "/api/v1/customer/verify-otp", "/api/customer/verify-otp",
+                                 "/api/v1/customer/resend-otp", "/api/customer/resend-otp",
                                  "/api/v1/customer/register", "/api/customer/register",
+                                 "/api/v1/customer/forgot-password", "/api/customer/forgot-password",
+                                 "/api/v1/customer/reset-password", "/api/customer/reset-password",
                                  "/api/v1/public/**", "/api/public/**").permitAll()
                 // Swagger
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

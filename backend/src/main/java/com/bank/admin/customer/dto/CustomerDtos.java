@@ -23,6 +23,28 @@ public final class CustomerDtos {
         @NotBlank(message = "Mật khẩu không được để trống") String password
     ) {}
 
+    @Builder
+    public record CustomerLoginStep1Response(
+        String username,
+        String fullName,
+        String customerType,
+        String tempToken,
+        String devOtp,
+        String maskedPhone,
+        String maskedEmail
+    ) {}
+
+    public record CustomerVerifyOtpRequest(
+        @NotBlank(message = "Tên đăng nhập không được để trống") String username,
+        @NotBlank(message = "Phiên xác thực không được để trống") String tempToken,
+        @NotBlank(message = "Mã OTP không được để trống") String otpCode
+    ) {}
+
+    public record CustomerResendOtpRequest(
+        @NotBlank(message = "Tên đăng nhập không được để trống") String username,
+        @NotBlank(message = "Phiên xác thực không được để trống") String tempToken
+    ) {}
+
     public record CustomerRegisterRequest(
         @NotBlank(message = "Tên đăng nhập không được để trống") String username,
         @NotBlank(message = "Mật khẩu không được để trống") String password,
@@ -92,6 +114,98 @@ public final class CustomerDtos {
         String representativeName,
         String businessLicenseNumber,
         BigDecimal charterCapital
+    ) {}
+
+    public record ForgotPasswordRequest(
+        @NotBlank(message = "Vui lòng nhập tên đăng nhập hoặc số CCCD/SĐT") String identifier
+    ) {}
+
+    public record ResetPasswordRequest(
+        @NotBlank(message = "Vui lòng nhập tên đăng nhập") String username,
+        @NotBlank(message = "Mã OTP không được để trống") String otpCode,
+        @NotBlank(message = "Mật khẩu mới không được để trống") String newPassword
+    ) {}
+
+    // ==========================================
+    // KHÁCH HÀNG: DISPUTES & SUPPORT TICKETS
+    // ==========================================
+    public record CreateDisputeRequest(
+        @NotBlank(message = "Mã giao dịch không được để trống") String transactionCode,
+        @NotBlank(message = "Lý do tra soát không được để trống") String reason
+    ) {}
+
+    @Builder
+    public record CustomerDisputeResponse(
+        Long id,
+        String disputeCode,
+        String transactionCode,
+        String reason,
+        String status,
+        String resolutionNote,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
+
+    public record CreateSupportTicketRequest(
+        @NotBlank(message = "Tiêu đề không được để trống") String title,
+        @NotBlank(message = "Nội dung yêu cầu không được để trống") String content,
+        String priority
+    ) {}
+
+    @Builder
+    public record CustomerTicketResponse(
+        Long id,
+        String ticketCode,
+        String title,
+        String content,
+        String priority,
+        String status,
+        Instant createdAt,
+        Instant updatedAt
+    ) {}
+
+    // ==========================================
+    // KHÁCH HÀNG DOANH NGHIỆP: DỊCH VỤ TRẢ LƯƠNG (PAYROLL)
+    // ==========================================
+    public record PayrollBatchRequest(
+        String batchName,
+        String description,
+        String payrollMonth,
+        @NotNull(message = "Danh sách chi lương không được rỗng") List<PayrollItemRequest> items
+    ) {
+        public String getEffectiveBatchName() {
+            if (batchName != null && !batchName.isBlank()) return batchName.trim();
+            if (description != null && !description.isBlank()) return description.trim();
+            if (payrollMonth != null && !payrollMonth.isBlank()) return "Chi trả lương tháng " + payrollMonth.trim();
+            return "Đợt chi trả lương doanh nghiệp";
+        }
+    }
+
+    public record PayrollItemRequest(
+        @NotBlank(message = "Họ tên nhân viên không được để trống") String employeeName,
+        String receiverAccountNumber,
+        String accountNumber,
+        String bankName,
+        @NotNull(message = "Số tiền lương không được để trống")
+        @DecimalMin(value = "50000", message = "Số tiền lương tối thiểu 50,000 VND") BigDecimal amount,
+        String note
+    ) {
+        public String getEffectiveAccountNumber() {
+            if (receiverAccountNumber != null && !receiverAccountNumber.isBlank()) return receiverAccountNumber.trim();
+            if (accountNumber != null && !accountNumber.isBlank()) return accountNumber.trim();
+            return "0011000000000";
+        }
+    }
+
+    @Builder
+    public record PayrollBatchResponse(
+        String batchCode,
+        String batchName,
+        Integer totalEmployees,
+        BigDecimal totalAmount,
+        String status,
+        Instant executedAt,
+        String message
     ) {}
 
     // ==========================================

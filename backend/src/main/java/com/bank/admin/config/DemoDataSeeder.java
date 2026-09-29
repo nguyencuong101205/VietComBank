@@ -71,7 +71,9 @@ public class DemoDataSeeder {
                 roleRepository.save(Role.builder().code("ROLE_MANAGER")
                     .name("Quản lý phê duyệt").description("Duyệt hồ sơ, hạn mức và xem báo cáo").build()));
             manager.setPermissions(new java.util.LinkedHashSet<>(java.util.List.of(
-                perms.get("APPROVE_LOAN"), perms.get("REPORT_EXPORT"))));
+                perms.get("APPROVE_LOAN"),
+                perms.get("REPORT_EXPORT"),
+                perms.get("DATA_UPDATE_RATES"))));
 
             Role staff = roleRepository.findByCode("ROLE_STAFF").orElseGet(() ->
                 roleRepository.save(Role.builder().code("ROLE_STAFF")
@@ -80,7 +82,9 @@ public class DemoDataSeeder {
                 perms.get("STAFF_CUSTOMER_ADVISORY"),
                 perms.get("STAFF_SUPPORT_TICKET"),
                 perms.get("STAFF_DISPUTE_HANDLE"),
-                perms.get("STAFF_FINANCIAL_TX"))));
+                perms.get("STAFF_FINANCIAL_TX"),
+                perms.get("REPORT_EXPORT"),
+                perms.get("DATA_UPDATE_RATES"))));
 
             roleRepository.saveAll(java.util.List.of(admin, manager, staff));
 

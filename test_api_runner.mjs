@@ -114,10 +114,15 @@ async function runAllTests() {
   // ================= 3. CUSTOMER PORTAL =================
   console.log('📌 3. KIỂM THỬ CỔNG KHÁCH HÀNG SỐ (CUSTOMER PORTAL)');
 
-  // 3.1 Customer Login
+  // 3.1 Customer Login (2FA: Step 1 Password -> Step 2 OTP)
   res = await request('POST', '/customer/auth/login', { username: 'kh_thuha', password: 'Customer@123' });
+  let custTemp = res.data?.data?.tempToken;
+  let custOtp = res.data?.data?.devOtp;
+  if (custTemp && custOtp) {
+    res = await request('POST', '/customer/auth/verify-otp', { username: 'kh_thuha', tempToken: custTemp, otpCode: custOtp });
+  }
   tokens.customer = res.data?.data?.accessToken || res.data?.data?.token || '';
-  recordResult('TC-CUST-01', 'Khách hàng Đăng nhập (kh_thuha)', 'CUSTOMER', res.status === 200 && !!tokens.customer, res.status);
+  recordResult('TC-CUST-01', 'Khách hàng Đăng nhập 2FA OTP (kh_thuha)', 'CUSTOMER', res.status === 200 && !!tokens.customer, res.status);
 
   // 3.2 Customer Profile
   res = await request('GET', '/customer/profile', null, tokens.customer);

@@ -29,6 +29,7 @@ import {
   SwapOutlined,
   ThunderboltOutlined,
   UserOutlined,
+  CustomerServiceOutlined,
 } from '@ant-design/icons';
 import { useCustomerAuth } from '../store/CustomerAuthContext';
 import { useLanguage } from '../store/LanguageContext';
@@ -64,6 +65,7 @@ export default function CustomerLayout({ children }) {
           { type: 'group', label: t('customer.groupEnterprise') },
           { key: '/customer/loans/business', icon: <SolutionOutlined />, label: t('customer.menuBusinessLoan') },
           { key: '/customer/trade-finance', icon: <SwapOutlined />, label: t('customer.menuTradeFinance') },
+          { key: '/customer/payroll', icon: <ThunderboltOutlined />, label: 'Chi trả lương lô (Payroll)' },
           { key: '/customer/cash-flow', icon: <LineChartOutlined />, label: t('customer.menuCashFlow') },
           { key: '/customer/savings', icon: <SafetyCertificateOutlined />, label: t('customer.menuEnterpriseSavings') },
         ]
@@ -72,6 +74,7 @@ export default function CustomerLayout({ children }) {
     { type: 'group', label: t('customer.groupUtilities') },
     { key: '/customer/my-applications', icon: <FileDoneOutlined />, label: t('customer.menuMyApplications') },
     { key: '/customer/transactions', icon: <HistoryOutlined />, label: t('customer.menuTransactions') },
+    { key: '/customer/support', icon: <CustomerServiceOutlined />, label: 'Hỗ trợ & Tra soát CSKH' },
   ];
 
   const selectedKey = window.location.hash.replace('#', '') || '/customer/dashboard';
