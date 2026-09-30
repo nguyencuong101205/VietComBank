@@ -2,11 +2,16 @@ package com.bank.admin.staff;
 
 import com.bank.admin.approval.Customer;
 import com.bank.admin.approval.CustomerRepository;
+import com.bank.admin.common.ApiException;
 import com.bank.admin.common.ApiResponse;
 import com.bank.admin.common.PagedResponse;
+import com.bank.admin.portal.ContactMessage;
+import com.bank.admin.portal.ContactMessageRepository;
 import com.bank.admin.staff.dto.StaffDtos.*;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +24,7 @@ public class StaffController {
 
     private final StaffService staffService;
     private final CustomerRepository customerRepository;
+    private final ContactMessageRepository contactMessageRepo;
 
     // =========================================================================
     // 0. DANH SÁCH KHÁCH HÀNG (Dùng cho dropdown / chọn trong các form)
@@ -125,6 +131,21 @@ public class StaffController {
         return ApiResponse.ok("Cập nhật tiến độ hỗ trợ CSKH thành công", staffService.processTicket(id, req));
     }
 
+    @GetMapping("/tickets/{id}/messages")
+    @PreAuthorize("hasAnyAuthority('STAFF_SUPPORT_TICKET', 'ROLE_ADMIN')")
+    public ApiResponse<List<TicketMessageDto>> getTicketMessages(@PathVariable Long id) {
+        return ApiResponse.ok(staffService.getTicketMessages(id));
+    }
+
+    @PostMapping("/tickets/{id}/messages")
+    @PreAuthorize("hasAnyAuthority('STAFF_SUPPORT_TICKET', 'ROLE_ADMIN')")
+    public ApiResponse<TicketMessageDto> sendStaffMessage(
+            @PathVariable Long id,
+            @Valid @RequestBody SendTicketMessageRequest req
+    ) {
+        return ApiResponse.ok("Đã gửi tin nhắn phản hồi tới khách hàng", staffService.sendStaffMessage(id, req));
+    }
+
     // =========================================================================
     // 4. GIAO DỊCH TÀI CHÍNH (FINANCIAL TRANSACTIONS)
     // =========================================================================
@@ -181,5 +202,51 @@ public class StaffController {
     ) {
         String staffName = com.bank.admin.security.SecurityContextUtils.currentUser().getFullName();
         return ApiResponse.ok("Cập nhật trạng thái lịch hẹn thành công", staffService.updateAppointmentStatus(id, req, staffName));
+    }
+
+    // =========================================================================
+    // 6. QUẢN LÝ TIN NHẮN LIÊN HỆ / GÓP Ý (CONTACT MESSAGES)
+    // =========================================================================
+
+    public record UpdateContactStatusRequest(
+        @NotBlank(message = "Trạng thái không được để trống") String status,
+        String responseNote
+    ) {}
+
+    @GetMapping("/contacts")
+    @PreAuthorize("hasAnyAuthority('STAFF_SUPPORT_TICKET', 'ROLE_ADMIN')")
+    public ApiResponse<PagedResponse<ContactMessage>> getContacts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        ContactMessage.Status st = null;
+        if (status != null && !status.isBlank()) {
+            try { st = ContactMessage.Status.valueOf(status.toUpperCase()); } catch (Exception ignored) {}
+        }
+        var p = contactMessageRepo.search(keyword, st, PageRequest.of(page, size));
+        return ApiResponse.ok(PagedResponse.of(p));
+    }
+
+    @PutMapping("/contacts/{id}/status")
+    @PreAuthorize("hasAnyAuthority('STAFF_SUPPORT_TICKET', 'ROLE_ADMIN')")
+    public ApiResponse<ContactMessage> updateContactStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateContactStatusRequest req
+    ) {
+        var msg = contactMessageRepo.findById(id)
+            .orElseThrow(() -> ApiException.notFound("Không tìm thấy tin nhắn liên hệ #" + id));
+        if (req.status() != null && !req.status().isBlank()) {
+            try {
+                msg.setStatus(ContactMessage.Status.valueOf(req.status().toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                throw ApiException.badRequest("Trạng thái không hợp lệ. Các giá trị cho phép: NEW, PROCESSING, RESOLVED");
+            }
+        }
+        if (req.responseNote() != null) {
+            msg.setResponseNote(req.responseNote().trim());
+        }
+        return ApiResponse.ok("Cập nhật trạng thái liên hệ thành công", contactMessageRepo.save(msg));
     }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Table,
   Button,
@@ -15,7 +15,11 @@ import {
   Col,
   Timeline,
   Descriptions,
-  Tooltip
+  Tooltip,
+  Tabs,
+  Avatar,
+  Spin,
+  Empty
 } from 'antd';
 import {
   CustomerServiceOutlined,
@@ -26,8 +30,11 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   UserOutlined,
-  MessageOutlined
+  MessageOutlined,
+  SendOutlined,
+  CommentOutlined
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import client from '../../api/client';
 
 const { Title, Text, Paragraph } = Typography;
@@ -50,9 +57,27 @@ export default function SupportTicketsPage() {
   const [createLoading, setCreateLoading] = useState(false);
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState('chat');
   const [processForm] = Form.useForm();
   const [processLoading, setProcessLoading] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
+
+  // Nhắn tin hai chiều CSKH
+  const [ticketMessages, setTicketMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sendingStaffMessage, setSendingStaffMessage] = useState(false);
+  const [staffReplyText, setStaffReplyText] = useState('');
+  const chatMessagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (detailModalOpen && detailTab === 'chat') {
+      scrollToBottom();
+    }
+  }, [ticketMessages, detailModalOpen, detailTab]);
 
   const fetchCustomers = async () => {
     try {
@@ -122,17 +147,50 @@ export default function SupportTicketsPage() {
     }
   };
 
-  const openDetailModal = async (record) => {
+  const openDetailModal = async (record, defaultTab = 'chat') => {
+    setDetailTab(defaultTab);
+    setStaffReplyText('');
+    setDetailModalOpen(true);
+    setLoadingMessages(true);
     try {
       const res = await client.get(`/staff/tickets/${record.id}`);
-      setSelectedTicket(res.data?.data || record);
+      const t = res.data?.data || record;
+      setSelectedTicket(t);
+      setTicketMessages(t.messages || []);
       processForm.setFieldsValue({
         status: record.status === 'NEW' ? 'IN_PROGRESS' : record.status,
         actionNote: ''
       });
-      setDetailModalOpen(true);
     } catch (err) {
       message.error('Không thể lấy chi tiết ticket');
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
+
+  const handleSendStaffMessage = async () => {
+    if (!staffReplyText || !staffReplyText.trim() || !selectedTicket) return;
+    const text = staffReplyText.trim();
+    setSendingStaffMessage(true);
+    try {
+      const res = await client.post(`/staff/tickets/${selectedTicket.id}/messages`, {
+        messageText: text
+      });
+      const newMsg = res.data?.data;
+      if (newMsg) {
+        setTicketMessages((prev) => [...prev, newMsg]);
+      }
+      setStaffReplyText('');
+      message.success('Đã gửi phản hồi CSKH tới khách hàng');
+      // Tự động chuyển trạng thái NEW sang IN_PROGRESS
+      if (selectedTicket.status === 'NEW') {
+        setSelectedTicket((prev) => ({ ...prev, status: 'IN_PROGRESS' }));
+        fetchData(pagination.current, pagination.pageSize);
+      }
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Không thể gửi tin nhắn phản hồi');
+    } finally {
+      setSendingStaffMessage(false);
     }
   };
 
@@ -172,9 +230,9 @@ export default function SupportTicketsPage() {
   const renderStatus = (status) => {
     switch (status) {
       case 'NEW':
-        return <Tag icon={<ClockCircleOutlined />} color="gold">Mới tạo</Tag>;
+        return <Tag icon={<ClockCircleOutlined />} color="gold">Mới tạo (Chờ nhận)</Tag>;
       case 'IN_PROGRESS':
-        return <Tag icon={<ReloadOutlined spin />} color="blue">Đang xử lý</Tag>;
+        return <Tag icon={<ReloadOutlined spin />} color="blue">Đang trao đổi hỗ trợ</Tag>;
       case 'TRANSFERRED':
         return <Tag color="purple">Chuyển phòng ban</Tag>;
       case 'RESOLVED':
@@ -217,18 +275,18 @@ export default function SupportTicketsPage() {
       title: 'Mức độ',
       dataIndex: 'priority',
       key: 'priority',
-      width: 130,
+      width: 120,
       render: renderPriority
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      width: 140,
+      width: 160,
       render: renderStatus
     },
     {
-      title: 'Nhân viên phụ trách',
+      title: 'Cán bộ phụ trách',
       dataIndex: 'assignedStaffName',
       key: 'assignedStaffName',
       width: 160,
@@ -238,7 +296,7 @@ export default function SupportTicketsPage() {
       title: 'Thời gian tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 160,
+      width: 150,
       render: (d) => (
         <span style={{ fontSize: 12, color: '#4b5563' }}>
           {d ? new Date(d).toLocaleString('vi-VN') : '—'}
@@ -248,19 +306,35 @@ export default function SupportTicketsPage() {
     {
       title: 'Thao tác',
       key: 'action',
-      width: 130,
+      width: 220,
       fixed: 'right',
       render: (_, record) => (
-        <Button
-          type="primary"
-          size="small"
-          style={{ background: '#005030', borderColor: '#005030' }}
-          onClick={() => openDetailModal(record)}
-        >
-          Xử lý & Nhật ký
-        </Button>
+        <Space size="small">
+          <Button
+            type="primary"
+            size="small"
+            icon={<MessageOutlined />}
+            style={{ background: '#005030', borderColor: '#005030', fontWeight: 500 }}
+            onClick={() => openDetailModal(record, 'chat')}
+          >
+            Nhắn tin
+          </Button>
+          <Button
+            size="small"
+            onClick={() => openDetailModal(record, 'process')}
+          >
+            Tiến trình
+          </Button>
+        </Space>
       )
     }
+  ];
+
+  const quickTemplates = [
+    'Vietcombank đã tiếp nhận yêu cầu và đang kiểm tra dữ liệu hỗ trợ Quý khách.',
+    'Cán bộ CSKH đã xử lý thành công trên hệ thống, Quý khách vui lòng thử đăng nhập lại ứng dụng VCB Digibank.',
+    'Quý khách vui lòng cung cấp thêm ảnh chụp màn hình mã lỗi hoặc thông tin chi tiết hơn.',
+    'Yêu cầu của Quý khách đã được hoàn tất hỗ trợ. Cảm ơn Quý khách đã tin dùng dịch vụ Vietcombank!'
   ];
 
   return (
@@ -276,7 +350,7 @@ export default function SupportTicketsPage() {
               Hỗ trợ & Chăm sóc Khách hàng (Support Tickets)
             </Title>
             <Text type="secondary">
-              Tiếp nhận sự cố ứng dụng VCB Digibank, mở khóa tài khoản, khiếu nại chất lượng dịch vụ, cập nhật nhật ký tương tác
+              Nhắn tin trao đổi hai chiều trực tiếp với khách hàng theo từng phiếu hỗ trợ, giải quyết sự cố tài khoản, ứng dụng VCB Digibank và tra soát
             </Text>
           </Col>
           <Col>
@@ -424,28 +498,40 @@ export default function SupportTicketsPage() {
         </Form>
       </Modal>
 
-      {/* MODAL CHI TIẾT & NHẬT KÝ TICKET */}
+      {/* MODAL CHI TIẾT & NHẬT KÝ & NHẮN TIN TICKET */}
       <Modal
         title={
-          <Space>
-            <CustomerServiceOutlined style={{ color: '#005030' }} />
-            <span>Tiến Trình Xử Lý Ticket: {selectedTicket?.ticketCode}</span>
-          </Space>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: 24 }}>
+            <Space>
+              <CustomerServiceOutlined style={{ color: '#005030', fontSize: 18 }} />
+              <div>
+                <span style={{ color: '#005030', fontWeight: 600, fontSize: 16 }}>
+                  Xử lý Ticket: {selectedTicket?.ticketCode}
+                </span>
+                <span style={{ marginLeft: 8, fontSize: 13, color: '#666' }}>
+                  ({selectedTicket?.customerName} - {selectedTicket?.customerPhone})
+                </span>
+              </div>
+            </Space>
+            <Space>
+              {selectedTicket && renderPriority(selectedTicket.priority)}
+              {selectedTicket && renderStatus(selectedTicket.status)}
+            </Space>
+          </div>
         }
         open={detailModalOpen}
         onCancel={() => setDetailModalOpen(false)}
         footer={null}
-        width={750}
+        width={850}
+        destroyOnClose
       >
         {selectedTicket && (
           <div>
-            <Descriptions size="small" bordered column={2} style={{ marginBottom: 16, marginTop: 12 }}>
+            <Descriptions size="small" bordered column={2} style={{ marginBottom: 12, marginTop: 8 }}>
               <Descriptions.Item label="Khách hàng">
                 <Text strong>{selectedTicket.customerName}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="Số điện thoại">{selectedTicket.customerPhone}</Descriptions.Item>
-              <Descriptions.Item label="Mức độ">{renderPriority(selectedTicket.priority)}</Descriptions.Item>
-              <Descriptions.Item label="Trạng thái">{renderStatus(selectedTicket.status)}</Descriptions.Item>
               <Descriptions.Item label="Tiêu đề" span={2}>
                 <Text strong style={{ color: '#005030' }}>{selectedTicket.title}</Text>
               </Descriptions.Item>
@@ -454,71 +540,234 @@ export default function SupportTicketsPage() {
               </Descriptions.Item>
             </Descriptions>
 
-            <Card title="Nhật ký tương tác & Xử lý sự cố" size="small" style={{ marginBottom: 16 }}>
-              {selectedTicket.logs && selectedTicket.logs.length > 0 ? (
-                <Timeline style={{ marginTop: 16 }}>
-                  {selectedTicket.logs.map((log) => (
-                    <Timeline.Item key={log.id} color="#005030">
-                      <div>
-                        <Text strong style={{ color: '#005030' }}>{log.staffName}</Text>
-                        <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
-                          {new Date(log.createdAt).toLocaleString('vi-VN')}
+            <Tabs
+              activeKey={detailTab}
+              onChange={setDetailTab}
+              items={[
+                {
+                  key: 'chat',
+                  label: (
+                    <span style={{ fontWeight: 600 }}>
+                      <MessageOutlined /> Nhắn tin trao đổi với Khách hàng ({ticketMessages.length})
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '480px' }}>
+                      {/* Khung chat */}
+                      <div
+                        style={{
+                          flex: 1,
+                          overflowY: 'auto',
+                          padding: '14px',
+                          background: '#f4f6f8',
+                          borderRadius: 8,
+                          border: '1px solid #e5e7eb',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 12,
+                        }}
+                      >
+                        {loadingMessages ? (
+                          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                            <Spin tip="Đang tải tin nhắn trao đổi..." />
+                          </div>
+                        ) : ticketMessages.length === 0 ? (
+                          <Empty description="Chưa có tin nhắn trao đổi nào" />
+                        ) : (
+                          ticketMessages.map((msg, idx) => {
+                            const isStaff = msg.senderType === 'STAFF';
+                            return (
+                              <div
+                                key={msg.id || idx}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: isStaff ? 'row-reverse' : 'row',
+                                  alignItems: 'flex-start',
+                                  gap: 10,
+                                }}
+                              >
+                                <Avatar
+                                  style={{
+                                    backgroundColor: isStaff ? '#005030' : '#fa8c16',
+                                    flexShrink: 0,
+                                  }}
+                                  icon={isStaff ? <CustomerServiceOutlined /> : <UserOutlined />}
+                                />
+                                <div
+                                  style={{
+                                    maxWidth: '75%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: isStaff ? 'flex-end' : 'flex-start',
+                                  }}
+                                >
+                                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 2 }}>
+                                    <span style={{ fontWeight: 600, color: isStaff ? '#005030' : '#d46b08' }}>
+                                      {isStaff ? `${msg.senderName} (Bạn)` : msg.senderName}
+                                    </span>
+                                    <span style={{ marginLeft: 8 }}>
+                                      {msg.createdAt ? dayjs(msg.createdAt).format('HH:mm DD/MM') : ''}
+                                    </span>
+                                  </div>
+                                  <div
+                                    style={{
+                                      padding: '10px 14px',
+                                      borderRadius: isStaff ? '14px 2px 14px 14px' : '2px 14px 14px 14px',
+                                      background: isStaff ? '#005030' : '#ffffff',
+                                      color: isStaff ? '#ffffff' : '#1f2937',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                                      fontSize: 14,
+                                      lineHeight: 1.5,
+                                      whiteSpace: 'pre-wrap',
+                                      wordBreak: 'break-word',
+                                    }}
+                                  >
+                                    {msg.messageText}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                        <div ref={chatMessagesEndRef} />
+                      </div>
+
+                      {/* Gợi ý câu trả lời mẫu nhanh */}
+                      <div style={{ marginTop: 8 }}>
+                        <Text type="secondary" style={{ fontSize: 12, marginRight: 6 }}>
+                          Trả lời nhanh:
                         </Text>
+                        <Space wrap size={[4, 4]}>
+                          {quickTemplates.map((tmpl, idx) => (
+                            <Tag
+                              key={idx}
+                              style={{ cursor: 'pointer', borderRadius: 12 }}
+                              onClick={() => setStaffReplyText(tmpl)}
+                            >
+                              {tmpl.length > 35 ? tmpl.substring(0, 35) + '...' : tmpl}
+                            </Tag>
+                          ))}
+                        </Space>
                       </div>
-                      <div style={{ marginTop: 4, background: '#f5f5f5', padding: '6px 10px', borderRadius: 4 }}>
-                        {log.actionNote}
+
+                      {/* Ô nhập tin nhắn */}
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          <TextArea
+                            rows={2}
+                            placeholder="Nhập nội dung phản hồi gửi trực tiếp tới khách hàng (Nhấn Gửi hoặc Ctrl+Enter)..."
+                            value={staffReplyText}
+                            onChange={(e) => setStaffReplyText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                e.preventDefault();
+                                handleSendStaffMessage();
+                              }
+                            }}
+                            style={{ borderRadius: 8, resize: 'none' }}
+                          />
+                          <Button
+                            type="primary"
+                            icon={<SendOutlined />}
+                            loading={sendingStaffMessage}
+                            disabled={!staffReplyText.trim()}
+                            onClick={handleSendStaffMessage}
+                            style={{
+                              height: 'auto',
+                              padding: '0 20px',
+                              background: '#005030',
+                              borderColor: '#005030',
+                              fontWeight: 600,
+                              borderRadius: 8,
+                            }}
+                          >
+                            Gửi phản hồi
+                          </Button>
+                        </div>
                       </div>
-                    </Timeline.Item>
-                  ))}
-                </Timeline>
-              ) : (
-                <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: '12px 0' }}>
-                  Chưa có nhật ký ghi nhận xử lý nào
-                </Text>
-              )}
-            </Card>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'process',
+                  label: (
+                    <span style={{ fontWeight: 600 }}>
+                      <CommentOutlined /> Tiến trình & Nhật ký nội bộ ({selectedTicket.logs?.length || 0})
+                    </span>
+                  ),
+                  children: (
+                    <div>
+                      <Card title="Nhật ký tương tác & Xử lý sự cố" size="small" style={{ marginBottom: 16 }}>
+                        {selectedTicket.logs && selectedTicket.logs.length > 0 ? (
+                          <Timeline style={{ marginTop: 16 }}>
+                            {selectedTicket.logs.map((log) => (
+                              <Timeline.Item key={log.id} color="#005030">
+                                <div>
+                                  <Text strong style={{ color: '#005030' }}>{log.staffName}</Text>
+                                  <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
+                                    {new Date(log.createdAt).toLocaleString('vi-VN')}
+                                  </Text>
+                                </div>
+                                <div style={{ marginTop: 4, background: '#f5f5f5', padding: '6px 10px', borderRadius: 4 }}>
+                                  {log.actionNote}
+                                </div>
+                              </Timeline.Item>
+                            ))}
+                          </Timeline>
+                        ) : (
+                          <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: '12px 0' }}>
+                            Chưa có nhật ký ghi nhận xử lý nào
+                          </Text>
+                        )}
+                      </Card>
 
-            <Card title="Thêm hành động xử lý / Trả lời CSKH" size="small" style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}>
-              <Form form={processForm} layout="vertical">
-                <Form.Item
-                  name="status"
-                  label="Cập nhật trạng thái ticket"
-                  rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
-                >
-                  <Select>
-                    <Option value="IN_PROGRESS">Đang xử lý (IN_PROGRESS)</Option>
-                    <Option value="TRANSFERRED">Chuyển bộ phận Kỹ thuật / Pháp chế (TRANSFERRED)</Option>
-                    <Option value="RESOLVED">Đã giải quyết xong cho khách hàng (RESOLVED)</Option>
-                    <Option value="CLOSED">Đóng ticket (CLOSED)</Option>
-                  </Select>
-                </Form.Item>
+                      <Card title="Cập nhật trạng thái xử lý & Đóng ticket" size="small" style={{ background: '#f6ffed', borderColor: '#b7eb8f' }}>
+                        <Form form={processForm} layout="vertical">
+                          <Form.Item
+                            name="status"
+                            label="Cập nhật trạng thái ticket"
+                            rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+                          >
+                            <Select>
+                              <Option value="IN_PROGRESS">Đang xử lý (IN_PROGRESS)</Option>
+                              <Option value="TRANSFERRED">Chuyển bộ phận Kỹ thuật / Pháp chế (TRANSFERRED)</Option>
+                              <Option value="RESOLVED">Đã giải quyết xong cho khách hàng (RESOLVED)</Option>
+                              <Option value="CLOSED">Đóng ticket (CLOSED)</Option>
+                            </Select>
+                          </Form.Item>
 
-                <Form.Item
-                  name="actionNote"
-                  label="Ghi chú hành động & Nội dung giải quyết"
-                  rules={[{ required: true, message: 'Vui lòng nhập nội dung xử lý' }]}
-                >
-                  <TextArea
-                    rows={3}
-                    placeholder="Ví dụ: Đã gọi điện hướng dẫn KH cài đặt lại Smart OTP; Đã mở khóa thẻ trên hệ thống core..."
-                  />
-                </Form.Item>
+                          <Form.Item
+                            name="actionNote"
+                            label="Ghi chú hành động & Nội dung giải quyết"
+                            rules={[{ required: true, message: 'Vui lòng nhập nội dung xử lý' }]}
+                          >
+                            <TextArea
+                              rows={3}
+                              placeholder="Ví dụ: Đã gọi điện hướng dẫn KH cài đặt lại Smart OTP; Đã mở khóa thẻ trên hệ thống core..."
+                            />
+                          </Form.Item>
 
-                <Button
-                  type="primary"
-                  icon={<MessageOutlined />}
-                  onClick={handleProcess}
-                  loading={processLoading}
-                  style={{ background: '#005030', borderColor: '#005030', fontWeight: 600 }}
-                  block
-                >
-                  Lưu Tiến Trình & Cập Nhật Ticket
-                </Button>
-              </Form>
-            </Card>
+                          <Button
+                            type="primary"
+                            icon={<CheckCircleOutlined />}
+                            onClick={handleProcess}
+                            loading={processLoading}
+                            style={{ background: '#005030', borderColor: '#005030', fontWeight: 600 }}
+                            block
+                          >
+                            Lưu Tiến Trình & Cập Nhật Trạng Thái
+                          </Button>
+                        </Form>
+                      </Card>
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
       </Modal>
     </div>
   );
 }
+

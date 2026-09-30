@@ -21,4 +21,8 @@ public interface DisputeRequestRepository extends JpaRepository<DisputeRequest, 
     Page<DisputeRequest> search(@Param("keyword") String keyword,
                                 @Param("status") DisputeRequest.Status status,
                                 Pageable pageable);
+
+    java.util.Optional<DisputeRequest> findByDisputeCode(String disputeCode);
+
+    java.util.List<DisputeRequest> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
 }

@@ -34,6 +34,7 @@ import {
   KeyOutlined,
   LockOutlined,
   LogoutOutlined,
+  MailOutlined,
   PercentageOutlined,
   ProfileOutlined,
   ReadOutlined,
@@ -58,6 +59,7 @@ export default function MainLayout({ children }) {
     { key: '/staff/advisories', icon: <ContactsOutlined />, label: t('admin.menuCrm'), permission: ['STAFF_CUSTOMER_ADVISORY'] },
     { key: '/staff/disputes', icon: <AuditOutlined />, label: t('admin.menuDisputes'), permission: ['STAFF_DISPUTE_HANDLE'] },
     { key: '/staff/tickets', icon: <CustomerServiceOutlined />, label: t('admin.menuTickets'), permission: ['STAFF_SUPPORT_TICKET'] },
+    { key: '/staff/contacts', icon: <MailOutlined />, label: 'Quản lý Thư liên hệ', permission: ['STAFF_SUPPORT_TICKET'] },
     { key: '/staff/transactions', icon: <TransactionOutlined />, label: t('admin.menuFinancialTx'), permission: ['STAFF_FINANCIAL_TX'] },
     { type: 'group', label: t('admin.groupData'), permission: ['DATA_UPDATE_RATES'] },
     { key: '/data/exchange-rates', icon: <DollarOutlined />, label: t('admin.menuExchangeRates'), permission: ['DATA_UPDATE_RATES'] },
@@ -68,7 +70,7 @@ export default function MainLayout({ children }) {
     { key: '/approvals', icon: <FileDoneOutlined />, label: t('admin.menuApprovals'), permission: ['APPROVE_LOAN'] },
     { type: 'group', label: t('admin.groupReports'), permission: ['REPORT_EXPORT'] },
     { key: '/reports/dashboard', icon: <FundOutlined />, label: t('admin.menuReports'), permission: ['REPORT_EXPORT'] },
-    { type: 'group', label: t('admin.groupSystem'), permission: [] },
+    { type: 'group', label: t('admin.groupSystem'), permission: ['SYS_MANAGE_USERS'] },
     { key: '/system/users', icon: <TeamOutlined />, label: t('admin.menuUsers'), permission: ['SYS_MANAGE_USERS'] },
     { key: '/system/audit-logs', icon: <HistoryOutlined />, label: t('admin.menuAuditLogs'), permission: ['SYS_MANAGE_USERS'] },
     { type: 'group', label: t('admin.groupCms'), permission: ['CMS_MANAGE_POST'] },
@@ -101,7 +103,7 @@ export default function MainLayout({ children }) {
       if (stored?.roles?.includes('ROLE_ADMIN')) return true;
       return stored?.permissions?.some((p) => required.includes(p)) ?? false;
     }
-  }, []);
+  }, [user, t]);
 
   const selectedKey = window.location.hash.replace('#', '') || '/';
 

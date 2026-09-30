@@ -23,4 +23,8 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, Lo
     Page<SupportTicket> search(@Param("keyword") String keyword,
                                @Param("status") SupportTicket.Status status,
                                Pageable pageable);
+
+    java.util.Optional<SupportTicket> findByTicketCode(String ticketCode);
+
+    java.util.List<SupportTicket> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
 }

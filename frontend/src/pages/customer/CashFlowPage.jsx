@@ -4,6 +4,8 @@ import {
   ArrowDownOutlined,
   ArrowUpOutlined,
   DollarOutlined,
+  DownloadOutlined,
+  FileExcelOutlined,
   HistoryOutlined,
   LineChartOutlined,
   ReloadOutlined,
@@ -28,6 +30,36 @@ export default function CashFlowPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    if (!data?.recentTransactions || data.recentTransactions.length === 0) {
+      message.warning('Không có dữ liệu giao dịch để xuất file');
+      return;
+    }
+
+    const headers = ['Mã giao dịch', 'Loại dòng tiền', 'Số tiền (VND)', 'Đối tác giao dịch', 'Ngân hàng', 'Nội dung', 'Thời gian'];
+    const rows = data.recentTransactions.map((tx) => [
+      `"${tx.transactionCode || ''}"`,
+      `"${tx.type === 'INFLOW' ? 'TIỀN VÀO (+)' : 'TIỀN RA (-)'}"`,
+      `"${tx.type === 'INFLOW' ? '' : '-'}${tx.amount || 0}"`,
+      `"${(tx.counterpartyName || '').replace(/"/g, '""')}"`,
+      `"${(tx.bankName || 'Vietcombank').replace(/"/g, '""')}"`,
+      `"${(tx.description || '').replace(/"/g, '""')}"`,
+      `"${tx.createdAt ? new Date(tx.createdAt).toLocaleString('vi-VN') : ''}"`,
+    ]);
+
+    const csvContent = '﻿' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `VCB_CashFlow_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    message.success('Đã xuất báo cáo dòng tiền doanh nghiệp thành công (Excel / CSV)!');
   };
 
   useEffect(() => {
@@ -109,9 +141,19 @@ export default function CashFlowPage() {
             Báo cáo tổng hợp luồng tiền thu - chi và dòng tiền thuần của tài khoản doanh nghiệp tại Vietcombank
           </Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={loadCashFlow} loading={loading}>
-          Làm mới
-        </Button>
+        <Space>
+          <Button
+            type="primary"
+            icon={<FileExcelOutlined />}
+            onClick={handleExportCsv}
+            style={{ background: '#005030', borderColor: '#005030', fontWeight: 600 }}
+          >
+            Xuất Excel / CSV
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={loadCashFlow} loading={loading}>
+            Làm mới
+          </Button>
+        </Space>
       </div>
 
       {/* STATS OVERVIEW */}

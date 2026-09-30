@@ -52,8 +52,15 @@ import {
   RightOutlined,
   RobotOutlined,
   SafetyCertificateOutlined,
+  SafetyOutlined,
+  SearchOutlined,
+  SecurityScanOutlined,
   SendOutlined,
+  TableOutlined,
   UserOutlined,
+  WarningOutlined,
+  FileTextOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import client from '../../api/client';
@@ -103,7 +110,19 @@ export default function VietcombankPublicPortal() {
   const [goldRates, setGoldRates] = useState([]);
   const [interestRates, setInterestRates] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [feeTemplates, setFeeTemplates] = useState([]);
+  const [chatbotFaqs, setChatbotFaqs] = useState([]);
+  const [branches, setBranches] = useState([]);
   const [loadingRates, setLoadingRates] = useState(false);
+
+  // Tra cứu nhanh tiến độ (Tracking Widget)
+  const [trackCode, setTrackCode] = useState('');
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const [trackResultModal, setTrackResultModal] = useState(false);
+  const [trackResult, setTrackResult] = useState(null);
+
+  // Modal Bảng phân bổ lịch trả nợ chi tiết (Amortization Schedule)
+  const [amortizationModalVisible, setAmortizationModalVisible] = useState(false);
 
   // Modal Đăng ký trực tuyến
   const [applyModalVisible, setApplyModalVisible] = useState(false);
@@ -204,21 +223,48 @@ export default function VietcombankPublicPortal() {
   const loadPublicData = async () => {
     setLoadingRates(true);
     try {
-      const [exRes, goldRes, intRes, postRes] = await Promise.allSettled([
+      const [exRes, goldRes, intRes, postRes, feeRes, faqRes, branchRes] = await Promise.allSettled([
         client.get('/public/rates/exchange'),
         client.get('/public/rates/gold'),
         client.get('/public/rates/interest'),
         client.get('/public/posts'),
+        client.get('/public/fees'),
+        client.get('/public/faqs'),
+        client.get('/public/branches'),
       ]);
 
       if (exRes.status === 'fulfilled') setExchangeRates(exRes.value.data?.data || []);
       if (goldRes.status === 'fulfilled') setGoldRates(goldRes.value.data?.data || []);
       if (intRes.status === 'fulfilled') setInterestRates(intRes.value.data?.data || []);
       if (postRes.status === 'fulfilled') setPosts(postRes.value.data?.data || []);
+      if (feeRes.status === 'fulfilled') setFeeTemplates(feeRes.value.data?.data || []);
+      if (faqRes.status === 'fulfilled') setChatbotFaqs(faqRes.value.data?.data || []);
+      if (branchRes.status === 'fulfilled') setBranches(branchRes.value.data?.data || []);
     } catch (e) {
       console.error('Lỗi tải dữ liệu cổng Vietcombank', e);
     } finally {
       setLoadingRates(false);
+    }
+  };
+
+  const handleQuickTrack = async () => {
+    if (!trackCode || !trackCode.trim()) {
+      message.warning('Vui lòng nhập mã hồ sơ, mã tra soát hoặc mã hỗ trợ để tra cứu');
+      return;
+    }
+    setTrackingLoading(true);
+    try {
+      const res = await client.get('/public/track', { params: { code: trackCode.trim() } });
+      if (res.data?.data) {
+        setTrackResult(res.data.data);
+        setTrackResultModal(true);
+      } else {
+        message.info(res.data?.message || `Không tìm thấy thông tin tương ứng với mã: ${trackCode.trim()}`);
+      }
+    } catch (e) {
+      message.error(e.response?.data?.message || 'Lỗi tra cứu tiến độ, vui lòng thử lại');
+    } finally {
+      setTrackingLoading(false);
     }
   };
 
@@ -249,24 +295,43 @@ export default function VietcombankPublicPortal() {
     setChatMessages((prev) => [...prev, userMsg]);
     if (!customText) setChatInput('');
 
-    // Phân tích ý định người dùng (Intent AI matching)
+    // Phân tích ý định người dùng (Intent AI matching kết hợp FAQ Database)
     setTimeout(() => {
       const lower = text.toLowerCase();
       let reply = '';
-      if (lower.includes('đặt lịch') || lower.includes('hẹn') || lower.includes('quầy') || lower.includes('chi nhánh')) {
-        reply = 'Dạ, để đặt lịch hẹn giao dịch tại quầy Vietcombank mà không phải chờ đợi, quý khách có thể bấm chuyển sang tab "📅 Đặt lịch hẹn" ngay bên trên hoặc điền thông tin chi nhánh, thời gian để hệ thống giữ chỗ ưu tiên cho quý khách!';
-      } else if (lower.includes('hotline') || lower.includes('liên hệ') || lower.includes('tổng đài') || lower.includes('số điện thoại') || lower.includes('cskh')) {
-        reply = 'Trung tâm Hỗ trợ Khách hàng Vietcombank phục vụ 24/7:\n📞 Hotline trong nước: 1900 54 54 13\n📞 Hotline quốc tế: (+84) 243 8243524\n✉️ Email: contact@vietcombank.com.vn\nQuý khách cũng có thể gửi phản ánh qua tab "📞 Liên hệ & Phản ánh" bên trên!';
-      } else if (lower.includes('lãi suất') || lower.includes('tiết kiệm') || lower.includes('gửi tiền')) {
-        reply = 'Hiện tại Vietcombank đang áp dụng mức lãi suất tiết kiệm trực tuyến hấp dẫn lên tới 6.8%/năm cho kỳ hạn 12 - 24 tháng. Quý khách có thể xem bảng lãi suất trực quan tại mục "Biểu lãi suất & Tỷ giá" hoặc sử dụng công cụ tính tiền lãi trên trang chủ!';
-      } else if (lower.includes('tỷ giá') || lower.includes('ngoại tệ') || lower.includes('usd') || lower.includes('eur')) {
-        reply = 'Tỷ giá ngoại tệ Vietcombank hôm nay: USD bán ra 25,820 VND, EUR chuyển khoản 27,300 VND. Bảng tỷ giá được cập nhật liên tục từ Hội sở chính tại đầu trang web!';
-      } else if (lower.includes('vay') || lower.includes('mua nhà') || lower.includes('mua xe') || lower.includes('hồ sơ')) {
-        reply = 'Vietcombank đang có chương trình cho vay ưu đãi với lãi suất chỉ từ 6.0%/năm, hạn mức vay tới 85% giá trị tài sản đảm bảo, thời hạn tối đa 35 năm. Quý khách có thể bấm "Nộp hồ sơ vay online" ngay góc trên để được duyệt trong 24h!';
-      } else if (lower.includes('hướng dẫn') || lower.includes('quên mật khẩu') || lower.includes('digibank') || lower.includes('mở tài khoản')) {
-        reply = 'Dạ, để xem hướng dẫn chi tiết về cách mở tài khoản eKYC, kích hoạt Smart OTP, hoặc xử lý quên mật khẩu, quý khách vui lòng chọn tab "📖 Hướng dẫn sử dụng" để xem các bước minh họa cụ thể nhé!';
-      } else {
-        reply = `Cảm ơn quý khách đã nhắn tin! Tôi đã ghi nhận yêu cầu về "${text}". Để được hỗ trợ chuyên sâu nhất, quý khách có thể liên hệ Tổng đài 1900 54 54 13 hoặc đặt lịch hẹn đến chi nhánh gần nhất để cán bộ tín dụng Vietcombank phục vụ trực tiếp!`;
+
+      // 1. Đối chiếu ngân hàng câu hỏi thường gặp FAQ lấy từ CSDL Vietcombank
+      if (chatbotFaqs && chatbotFaqs.length > 0) {
+        const matchedFaq = chatbotFaqs.find((f) => {
+          if (f.question && lower.includes(f.question.toLowerCase())) return true;
+          if (f.keywords) {
+            const kwList = f.keywords.toLowerCase().split(',').map((k) => k.trim());
+            return kwList.some((kw) => kw && lower.includes(kw));
+          }
+          return false;
+        });
+        if (matchedFaq) {
+          reply = `💡 ${matchedFaq.answer}\n\n(Câu hỏi liên quan: "${matchedFaq.question}")`;
+        }
+      }
+
+      // 2. Phân loại theo bộ quy tắc nghiệp vụ mặc định
+      if (!reply) {
+        if (lower.includes('đặt lịch') || lower.includes('hẹn') || lower.includes('quầy') || lower.includes('chi nhánh')) {
+          reply = 'Dạ, để đặt lịch hẹn giao dịch tại quầy Vietcombank mà không phải chờ đợi, quý khách có thể bấm chuyển sang tab "📅 Đặt lịch hẹn" ngay bên trên hoặc điền thông tin chi nhánh, thời gian để hệ thống giữ chỗ ưu tiên cho quý khách!';
+        } else if (lower.includes('hotline') || lower.includes('liên hệ') || lower.includes('tổng đài') || lower.includes('số điện thoại') || lower.includes('cskh')) {
+          reply = 'Trung tâm Hỗ trợ Khách hàng Vietcombank phục vụ 24/7:\n📞 Hotline trong nước: 1900 54 54 13\n📞 Hotline quốc tế: (+84) 243 8243524\n✉️ Email: contact@vietcombank.com.vn\nQuý khách cũng có thể gửi phản ánh qua tab "📞 Liên hệ & Phản ánh" bên trên!';
+        } else if (lower.includes('lãi suất') || lower.includes('tiết kiệm') || lower.includes('gửi tiền')) {
+          reply = 'Hiện tại Vietcombank đang áp dụng mức lãi suất tiết kiệm trực tuyến hấp dẫn lên tới 6.8%/năm cho kỳ hạn 12 - 24 tháng. Quý khách có thể xem bảng lãi suất trực quan tại mục "Biểu lãi suất & Tỷ giá" hoặc sử dụng công cụ tính tiền lãi trên trang chủ!';
+        } else if (lower.includes('tỷ giá') || lower.includes('ngoại tệ') || lower.includes('usd') || lower.includes('eur')) {
+          reply = 'Tỷ giá ngoại tệ Vietcombank hôm nay: USD bán ra 25,820 VND, EUR chuyển khoản 27,300 VND. Bảng tỷ giá được cập nhật liên tục từ Hội sở chính tại đầu trang web!';
+        } else if (lower.includes('vay') || lower.includes('mua nhà') || lower.includes('mua xe') || lower.includes('hồ sơ')) {
+          reply = 'Vietcombank đang có chương trình cho vay ưu đãi với lãi suất chỉ từ 6.0%/năm, hạn mức vay tới 85% giá trị tài sản đảm bảo, thời hạn tối đa 35 năm. Quý khách có thể bấm "Nộp hồ sơ vay online" ngay góc trên để được duyệt trong 24h!';
+        } else if (lower.includes('hướng dẫn') || lower.includes('quên mật khẩu') || lower.includes('digibank') || lower.includes('mở tài khoản')) {
+          reply = 'Dạ, để xem hướng dẫn chi tiết về cách mở tài khoản eKYC, kích hoạt Smart OTP, hoặc xử lý quên mật khẩu, quý khách vui lòng chọn tab "📖 Hướng dẫn sử dụng" để xem các bước minh họa cụ thể nhé!';
+        } else {
+          reply = `Cảm ơn quý khách đã nhắn tin! Tôi đã ghi nhận yêu cầu về "${text}". Để được hỗ trợ chuyên sâu nhất, quý khách có thể liên hệ Tổng đài 1900 54 54 13 hoặc đặt lịch hẹn đến chi nhánh gần nhất để cán bộ tín dụng Vietcombank phục vụ trực tiếp!`;
+        }
       }
 
       setChatMessages((prev) => [
@@ -278,7 +343,7 @@ export default function VietcombankPublicPortal() {
           time: dayjs().format('HH:mm'),
         },
       ]);
-    }, 400);
+    }, 350);
   };
 
   const handleAppointmentSubmit = async (values) => {
@@ -321,7 +386,14 @@ export default function VietcombankPublicPortal() {
   const handleContactSubmit = async (values) => {
     setSubmittingContact(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      const res = await client.post('/public/contacts', {
+        fullName: values.fullName,
+        phoneNumber: values.phoneNumber,
+        email: values.email || null,
+        subject: values.subject,
+        message: values.message,
+      });
+      const msgId = res.data?.data?.messageId || 'VCB';
       message.success('Đã gửi thông tin liên hệ thành công! Vietcombank sẽ phản hồi trong 24h.');
       contactForm.resetFields();
       setChatMessages((prev) => [
@@ -329,16 +401,43 @@ export default function VietcombankPublicPortal() {
         {
           id: Date.now(),
           sender: 'bot',
-          text: `✅ Cảm ơn quý khách ${values.fullName}! Tin nhắn với chủ đề "${values.subject}" đã được chuyển đến Trung tâm CSKH Vietcombank. Chuyên viên sẽ liên hệ lại qua SĐT ${values.phoneNumber} hoặc Email trong vòng 24 giờ.`,
+          text: `✅ Cảm ơn quý khách ${values.fullName}! Tin nhắn với chủ đề "${values.subject}" đã được ghi nhận trên hệ thống (Mã tiếp nhận #${msgId}). Chuyên viên CSKH Vietcombank sẽ liên hệ lại qua SĐT ${values.phoneNumber} hoặc Email trong vòng 24 giờ.`,
           time: dayjs().format('HH:mm'),
         },
       ]);
       setChatTab('chat');
     } catch (e) {
-      message.error('Không thể gửi liên hệ, vui lòng thử lại');
+      message.error(e.response?.data?.message || 'Không thể gửi liên hệ, vui lòng thử lại');
     } finally {
       setSubmittingContact(false);
     }
+  };
+
+  // Tạo bảng phân bổ lịch trả nợ chi tiết (Amortization Schedule)
+  const generateAmortizationSchedule = () => {
+    const p = Number(calcAmount) || 0;
+    const n = Number(calcTerm) || 12;
+    const annualRate = (Number(calcRate) || 0) / 100;
+    const monthlyRate = annualRate / 12;
+    const monthlyPrincipal = p / n;
+
+    const schedule = [];
+    let currentBalance = p;
+    for (let i = 1; i <= n; i++) {
+      const interest = currentBalance * monthlyRate;
+      const totalPay = monthlyPrincipal + interest;
+      const endBalance = Math.max(0, currentBalance - monthlyPrincipal);
+      schedule.push({
+        period: i,
+        startBalance: Math.round(currentBalance),
+        principal: Math.round(monthlyPrincipal),
+        interest: Math.round(interest),
+        totalPay: Math.round(totalPay),
+        endBalance: Math.round(endBalance),
+      });
+      currentBalance = endBalance;
+    }
+    return schedule;
   };
 
   // Tính toán tiền lãi
@@ -440,6 +539,57 @@ export default function VietcombankPublicPortal() {
       key: 'ratePercentage',
       align: 'right',
       render: (r) => <Text strong style={{ color: '#d46b08', fontSize: 14 }}>{r}%</Text>,
+    },
+  ];
+
+  const feeColumns = [
+    {
+      title: 'Tên biểu phí / Biểu mẫu dịch vụ',
+      dataIndex: 'title',
+      key: 'title',
+      render: (t) => (
+        <Text strong style={{ color: '#005030' }}>
+          <FileTextOutlined style={{ marginRight: 6 }} />
+          {t}
+        </Text>
+      ),
+    },
+    {
+      title: 'Định dạng',
+      dataIndex: 'fileType',
+      key: 'fileType',
+      width: 110,
+      render: (ft) => {
+        const upper = (ft || 'PDF').toUpperCase();
+        const color = upper.includes('PDF') ? 'red' : upper.includes('DOC') ? 'blue' : 'green';
+        return <Tag color={color}>{upper}</Tag>;
+      },
+    },
+    {
+      title: 'Ngày ban hành',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 140,
+      render: (d) => (d ? dayjs(d).format('DD/MM/YYYY') : 'Hiện hành'),
+    },
+    {
+      title: 'Thao tác',
+      key: 'action',
+      width: 140,
+      align: 'center',
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<DownloadOutlined />}
+          style={{ background: '#005030', borderColor: '#005030' }}
+          onClick={() => {
+            message.success(`Đang tải xuống biểu mẫu: "${record.title}". Mẫu biểu chuẩn có hiệu lực của Vietcombank.`);
+          }}
+        >
+          Tải biểu mẫu
+        </Button>
+      ),
     },
   ];
 
@@ -749,7 +899,68 @@ export default function VietcombankPublicPortal() {
           </Row>
         </Card>
 
-        {/* 3. BẢNG DỮ LIỆU BIẾN ĐỘNG TRỰC TUYẾN (TỶ GIÁ / GIÁ VÀNG / LÃI SUẤT) */}
+        {/* 2b. THANH TRA CỨU NHANH TIẾN ĐỘ HỒ SƠ / TRA SOÁT / PHIẾU HỖ TRỢ */}
+        <Card
+          style={{
+            background: '#ffffff',
+            borderRadius: 12,
+            marginBottom: 28,
+            boxShadow: '0 4px 16px rgba(0,80,48,0.08)',
+            border: '1.5px solid #d9f7be',
+          }}
+          bodyStyle={{ padding: '20px 28px' }}
+        >
+          <Row gutter={[16, 16]} align="middle">
+            <Col xs={24} md={8}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Avatar
+                  size={44}
+                  style={{ backgroundColor: '#E8F5E9', color: '#005030' }}
+                  icon={<SearchOutlined style={{ fontSize: 22 }} />}
+                />
+                <div>
+                  <Text strong style={{ color: '#005030', fontSize: 16, display: 'block' }}>
+                    Tra cứu tiến độ hồ sơ &amp; Khiếu nại
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Tra cứu nhanh theo mã hồ sơ (APP-...), mã tra soát (DSP-...) hoặc ticket (TK-...)
+                  </Text>
+                </div>
+              </div>
+            </Col>
+            <Col xs={24} md={16}>
+              <Space.Compact style={{ width: '100%' }}>
+                <Input
+                  size="large"
+                  placeholder="Nhập mã định danh (Ví dụ: APP-2026-001, DSP-2026-001, TK-2026-001...)"
+                  prefix={<SearchOutlined style={{ color: '#005030' }} />}
+                  value={trackCode}
+                  onChange={(e) => setTrackCode(e.target.value)}
+                  onPressEnter={handleQuickTrack}
+                  style={{ borderRadius: '8px 0 0 8px' }}
+                  allowClear
+                />
+                <Button
+                  type="primary"
+                  size="large"
+                  loading={trackingLoading}
+                  onClick={handleQuickTrack}
+                  style={{
+                    background: '#005030',
+                    borderColor: '#005030',
+                    fontWeight: 700,
+                    padding: '0 28px',
+                    borderRadius: '0 8px 8px 0',
+                  }}
+                >
+                  Tra cứu ngay
+                </Button>
+              </Space.Compact>
+            </Col>
+          </Row>
+        </Card>
+
+        {/* 3. BẢNG DỮ LIỆU BIẾN ĐỘNG TRỰC TUYẾN (TỶ GIÁ / GIÁ VÀNG / LÃI SUẤT / BIỂU PHÍ) */}
         <div id="rates-section" style={{ marginBottom: 32 }}>
           <Title level={3} style={{ color: '#005030', marginBottom: 4 }}>
             <DollarOutlined /> {t('portal.marketRatesTitle')}
@@ -800,6 +1011,24 @@ export default function VietcombankPublicPortal() {
                       dataSource={interestRates}
                       loading={loadingRates}
                       pagination={false}
+                      size="middle"
+                    />
+                  ),
+                },
+                {
+                  key: 'fees',
+                  label: (
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>
+                      <FileTextOutlined /> Biểu phí &amp; Biểu mẫu trực tuyến ({feeTemplates.length})
+                    </span>
+                  ),
+                  children: (
+                    <Table
+                      rowKey="templateId"
+                      columns={feeColumns}
+                      dataSource={feeTemplates}
+                      loading={loadingRates}
+                      pagination={{ pageSize: 6 }}
                       size="middle"
                     />
                   ),
@@ -939,12 +1168,30 @@ export default function VietcombankPublicPortal() {
                     </Space>
                   )}
 
+                  {calcType === 'LOAN' && (
+                    <Button
+                      block
+                      size="large"
+                      icon={<TableOutlined />}
+                      style={{
+                        marginTop: 16,
+                        borderColor: '#005030',
+                        color: '#005030',
+                        fontWeight: 600,
+                        background: '#fff',
+                      }}
+                      onClick={() => setAmortizationModalVisible(true)}
+                    >
+                      Xem lịch trả nợ chi tiết (Dư nợ giảm dần)
+                    </Button>
+                  )}
+
                   <Button
                     type="primary"
                     block
                     size="large"
                     style={{
-                      marginTop: 20,
+                      marginTop: calcType === 'LOAN' ? 12 : 20,
                       background: '#005030',
                       borderColor: '#005030',
                       fontWeight: 600,
@@ -1121,6 +1368,146 @@ export default function VietcombankPublicPortal() {
             ))}
           </div>
         </div>
+
+        {/* 5b. CẨM NANG GIAO DỊCH AN TOÀN & CẢNH BÁO AN NINH MẠNG */}
+        <div id="security-section" style={{ marginBottom: 40 }}>
+          <Card
+            style={{
+              borderRadius: 12,
+              border: '2px solid #ffccc7',
+              background: 'linear-gradient(180deg, #fffbfb 0%, #ffffff 100%)',
+              boxShadow: '0 4px 16px rgba(207,19,34,0.06)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Avatar
+                  size={46}
+                  style={{ backgroundColor: '#fff1f0', color: '#cf1322' }}
+                  icon={<SecurityScanOutlined style={{ fontSize: 24 }} />}
+                />
+                <div>
+                  <Title level={3} style={{ color: '#005030', margin: 0 }}>
+                    Cẩm nang Giao dịch An toàn &amp; Cảnh báo An ninh mạng
+                  </Title>
+                  <Text type="secondary">
+                    Chủ động phòng ngừa rủi ro lừa đảo công nghệ cao và bảo vệ tài sản tài khoản ngân hàng của Quý khách
+                  </Text>
+                </div>
+              </div>
+              <Tag color="error" style={{ fontSize: 13, padding: '4px 12px', fontWeight: 'bold' }}>
+                <WarningOutlined /> CẢNH BÁO KHẨN CẤP
+              </Tag>
+            </div>
+
+            <Row gutter={[20, 20]}>
+              <Col xs={24} sm={12} lg={6}>
+                <Card
+                  size="small"
+                  style={{
+                    height: '100%',
+                    background: '#fff',
+                    borderRadius: 8,
+                    borderTop: '4px solid #cf1322',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <Text strong style={{ color: '#cf1322', display: 'block', fontSize: 15, marginBottom: 8 }}>
+                    1. Tuyệt đối KHÔNG chia sẻ OTP
+                  </Text>
+                  <Paragraph type="secondary" style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                    Vietcombank <strong>KHÔNG BAO GIỜ</strong> yêu cầu cung cấp Mật khẩu hoặc Smart OTP qua điện thoại hay tin nhắn. Mọi yêu cầu OTP đều là lừa đảo.
+                  </Paragraph>
+                </Card>
+              </Col>
+
+              <Col xs={24} sm={12} lg={6}>
+                <Card
+                  size="small"
+                  style={{
+                    height: '100%',
+                    background: '#fff',
+                    borderRadius: 8,
+                    borderTop: '4px solid #fa8c16',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <Text strong style={{ color: '#d46b08', display: 'block', fontSize: 15, marginBottom: 8 }}>
+                    2. Cảnh giác đường link giả mạo
+                  </Text>
+                  <Paragraph type="secondary" style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                    Chỉ đăng nhập tại địa chỉ chính thức có ổ khóa bảo mật <code>vietcombank.com.vn</code>. Không click vào link lạ từ SMS Brandname giả mạo.
+                  </Paragraph>
+                </Card>
+              </Col>
+
+              <Col xs={24} sm={12} lg={6}>
+                <Card
+                  size="small"
+                  style={{
+                    height: '100%',
+                    background: '#fff',
+                    borderRadius: 8,
+                    borderTop: '4px solid #52c41a',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <Text strong style={{ color: '#389e0d', display: 'block', fontSize: 15, marginBottom: 8 }}>
+                    3. Bật Sinh trắc học QĐ 2345
+                  </Text>
+                  <Paragraph type="secondary" style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                    Cập nhật khuôn mặt khớp với dữ liệu trên thẻ CCCD gắn chip để bảo vệ giao dịch chuyển tiền trên 10 triệu đồng hoặc vượt 20 triệu đồng/ngày.
+                  </Paragraph>
+                </Card>
+              </Col>
+
+              <Col xs={24} sm={12} lg={6}>
+                <Card
+                  size="small"
+                  style={{
+                    height: '100%',
+                    background: '#fff',
+                    borderRadius: 8,
+                    borderTop: '4px solid #1890ff',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <Text strong style={{ color: '#096dd9', display: 'block', fontSize: 15, marginBottom: 8 }}>
+                    4. Khóa dịch vụ khẩn cấp 24/7
+                  </Text>
+                  <Paragraph type="secondary" style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                    Khi phát hiện giao dịch bất thường hoặc mất điện thoại, chủ động bấm <strong>Khóa thẻ khẩn cấp</strong> trên VCB Digibank hoặc gọi ngay <strong>1900 54 54 13</strong>.
+                  </Paragraph>
+                </Card>
+              </Col>
+            </Row>
+
+            <Divider style={{ margin: '20px 0 16px' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <Space>
+                <SafetyOutlined style={{ color: '#52c41a', fontSize: 18 }} />
+                <Text style={{ fontSize: 13, color: '#333' }}>
+                  Hệ thống bảo mật Vietcombank đạt chứng nhận tiêu chuẩn an ninh quốc tế PCI-DSS Level 1 cao nhất.
+                </Text>
+              </Space>
+              <Button
+                type="primary"
+                danger
+                icon={<PhoneOutlined />}
+                style={{ fontWeight: 600 }}
+                onClick={() => {
+                  Modal.warning({
+                    title: 'Đường dây nóng Khẩn cấp Vietcombank',
+                    content: 'Quý khách vui lòng gọi ngay Hotline 1900 54 54 13 (hoạt động 24/7) hoặc đến chi nhánh Vietcombank gần nhất để được khóa thẻ và phong tỏa tài khoản tức thì.',
+                    okText: 'Đã hiểu',
+                  });
+                }}
+              >
+                Hotline Khẩn cấp: 1900 54 54 13
+              </Button>
+            </div>
+          </Card>
+        </div>
       </Content>
 
       {/* 6. FOOTER CHUẨN VIETCOMBANK */}
@@ -1286,6 +1673,249 @@ export default function VietcombankPublicPortal() {
             </Form.Item>
           </Form>
         )}
+      </Modal>
+
+      {/* MODAL KẾT QUẢ TRA CỨU TIẾN ĐỘ */}
+      <Modal
+        title={
+          <Space style={{ color: '#005030', fontSize: 16 }}>
+            <SearchOutlined /> Kết quả tra cứu trực tuyến
+          </Space>
+        }
+        open={trackResultModal}
+        onCancel={() => setTrackResultModal(false)}
+        footer={[
+          <Button
+            key="close"
+            type="primary"
+            style={{ background: '#005030', borderColor: '#005030' }}
+            onClick={() => setTrackResultModal(false)}
+          >
+            Đóng
+          </Button>,
+        ]}
+        width={650}
+      >
+        {trackResult && (
+          <div style={{ marginTop: 12 }}>
+            <Alert
+              type="success"
+              message={
+                <Text strong style={{ color: '#005030', fontSize: 15 }}>
+                  {trackResult.type === 'APPLICATION'
+                    ? 'HỒ SƠ VAY VỐN / MỞ THẺ TÍN DỤNG'
+                    : trackResult.type === 'DISPUTE'
+                    ? 'YÊU CẦU TRA SOÁT KHIẾU NẠI GIAO DỊCH'
+                    : 'PHIẾU HỖ TRỢ CHĂM SÓC KHÁCH HÀNG'}
+                </Text>
+              }
+              description={trackResult.description}
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+
+            <Descriptions bordered column={1} size="middle">
+              <Descriptions.Item label="Mã định danh">
+                <Text copyable strong style={{ color: '#005030', fontSize: 15 }}>
+                  {trackResult.code}
+                </Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="Khách hàng">
+                <Text strong>{trackResult.customerName || 'Khách hàng'}</Text>
+              </Descriptions.Item>
+
+              {trackResult.itemType && (
+                <Descriptions.Item label="Phân loại hồ sơ">
+                  <Tag color="blue">{trackResult.itemType}</Tag>
+                </Descriptions.Item>
+              )}
+
+              {trackResult.requestedAmount && (
+                <Descriptions.Item label="Số tiền đề xuất">
+                  <Text strong style={{ color: '#d4380d' }}>
+                    {Number(trackResult.requestedAmount).toLocaleString('vi-VN')} VND
+                  </Text>
+                </Descriptions.Item>
+              )}
+
+              {trackResult.transactionCode && (
+                <Descriptions.Item label="Mã giao dịch liên quan">
+                  <Text copyable>{trackResult.transactionCode}</Text>
+                </Descriptions.Item>
+              )}
+
+              {trackResult.reason && (
+                <Descriptions.Item label="Lý do tra soát">
+                  <Paragraph style={{ margin: 0 }}>{trackResult.reason}</Paragraph>
+                </Descriptions.Item>
+              )}
+
+              {trackResult.resolutionNote && (
+                <Descriptions.Item label="Kết quả xử lý từ Cán bộ">
+                  <div style={{ background: '#f6ffed', padding: '8px 12px', borderRadius: 6, border: '1px solid #b7eb8f', color: '#135200' }}>
+                    {trackResult.resolutionNote}
+                  </div>
+                </Descriptions.Item>
+              )}
+
+              {trackResult.title && (
+                <Descriptions.Item label="Tiêu đề yêu cầu">
+                  <Text strong>{trackResult.title}</Text>
+                </Descriptions.Item>
+              )}
+
+              <Descriptions.Item label="Trạng thái hiện tại">
+                <Tag
+                  color={
+                    ['APPROVED', 'RESOLVED', 'CLOSED'].includes(trackResult.status)
+                      ? 'success'
+                      : ['PROCESSING', 'IN_PROGRESS'].includes(trackResult.status)
+                      ? 'processing'
+                      : trackResult.status === 'REJECTED'
+                      ? 'error'
+                      : 'gold'
+                  }
+                  style={{ fontWeight: 'bold' }}
+                >
+                  {trackResult.status}
+                </Tag>
+              </Descriptions.Item>
+
+              <Descriptions.Item label="Thời gian tiếp nhận">
+                {trackResult.createdAt ? dayjs(trackResult.createdAt).format('DD/MM/YYYY HH:mm:ss') : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
+      </Modal>
+
+      {/* MODAL BẢNG PHÂN BỔ LỊCH TRẢ NỢ CHI TIẾT (AMORTIZATION SCHEDULE) */}
+      <Modal
+        title={
+          <Space style={{ color: '#005030', fontSize: 16 }}>
+            <TableOutlined /> Bảng phân bổ lịch trả nợ chi tiết (Theo dư nợ giảm dần)
+          </Space>
+        }
+        open={amortizationModalVisible}
+        onCancel={() => setAmortizationModalVisible(false)}
+        footer={[
+          <Button
+            key="apply"
+            type="primary"
+            style={{ background: '#005030', borderColor: '#005030' }}
+            onClick={() => {
+              setAmortizationModalVisible(false);
+              applyForm.setFieldsValue({ requestedAmount: calcAmount });
+              setApplySuccessData(null);
+              setApplyModalVisible(true);
+            }}
+          >
+            Nộp hồ sơ theo gói này
+          </Button>,
+          <Button key="close" onClick={() => setAmortizationModalVisible(false)}>
+            Đóng
+          </Button>,
+        ]}
+        width={850}
+      >
+        <div style={{ marginTop: 12 }}>
+          {/* Tóm tắt gói vay */}
+          <Card size="small" style={{ background: '#f4fbf6', borderColor: '#b7eb8f', marginBottom: 16 }}>
+            <Row gutter={[16, 8]}>
+              <Col span={8}>
+                <Text type="secondary">Số tiền vay:</Text>{' '}
+                <Text strong style={{ color: '#005030' }}>
+                  {Number(calcAmount).toLocaleString('vi-VN')} đ
+                </Text>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary">Thời hạn:</Text>{' '}
+                <Text strong>{calcTerm} tháng ({calcTerm / 12} năm)</Text>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary">Lãi suất:</Text>{' '}
+                <Text strong style={{ color: '#d46b08' }}>{calcRate}% / năm</Text>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary">Tiền gốc hàng tháng:</Text>{' '}
+                <Text strong>
+                  {Number(Math.round(calcAmount / calcTerm)).toLocaleString('vi-VN')} đ
+                </Text>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary">Tổng tiền lãi cả kỳ:</Text>{' '}
+                <Text strong style={{ color: '#d4380d' }}>
+                  {Number(Math.round(calcResult().totalInterest)).toLocaleString('vi-VN')} đ
+                </Text>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary">Tổng số tiền trả:</Text>{' '}
+                <Text strong style={{ color: '#005030' }}>
+                  {Number(Math.round(calcResult().totalPayout)).toLocaleString('vi-VN')} đ
+                </Text>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* Bảng phân kỳ */}
+          <Table
+            dataSource={generateAmortizationSchedule()}
+            rowKey="period"
+            size="small"
+            pagination={{ pageSize: 12 }}
+            columns={[
+              {
+                title: 'Kỳ (Tháng)',
+                dataIndex: 'period',
+                key: 'period',
+                width: 90,
+                align: 'center',
+                render: (p) => <Tag color="#005030">Tháng {p}</Tag>,
+              },
+              {
+                title: 'Dư nợ đầu kỳ (VND)',
+                dataIndex: 'startBalance',
+                key: 'startBalance',
+                align: 'right',
+                render: (val) => Number(val).toLocaleString('vi-VN'),
+              },
+              {
+                title: 'Tiền gốc (VND)',
+                dataIndex: 'principal',
+                key: 'principal',
+                align: 'right',
+                render: (val) => Number(val).toLocaleString('vi-VN'),
+              },
+              {
+                title: 'Tiền lãi (VND)',
+                dataIndex: 'interest',
+                key: 'interest',
+                align: 'right',
+                render: (val) => (
+                  <Text style={{ color: '#d46b08' }}>{Number(val).toLocaleString('vi-VN')}</Text>
+                ),
+              },
+              {
+                title: 'Tổng trả kỳ này (VND)',
+                dataIndex: 'totalPay',
+                key: 'totalPay',
+                align: 'right',
+                render: (val) => (
+                  <Text strong style={{ color: '#005030' }}>
+                    {Number(val).toLocaleString('vi-VN')}
+                  </Text>
+                ),
+              },
+              {
+                title: 'Dư nợ cuối kỳ (VND)',
+                dataIndex: 'endBalance',
+                key: 'endBalance',
+                align: 'right',
+                render: (val) => Number(val).toLocaleString('vi-VN'),
+              },
+            ]}
+          />
+        </div>
       </Modal>
 
       {/* 8. NÚT NỔI CHATBOT AI ASSISTANT VIETCOMBANK */}
@@ -1495,13 +2125,23 @@ export default function VietcombankPublicPortal() {
                 rules={[{ required: true, message: 'Vui lòng chọn chi nhánh' }]}
                 initialValue="Chi nhánh Hoàn Kiếm - Hà Nội"
               >
-                <Select size="large">
-                  <Option value="Chi nhánh Hoàn Kiếm - Hà Nội">VCB Hoàn Kiếm - 198 Trần Quang Khải, Hà Nội</Option>
-                  <Option value="Chi nhánh Ba Đình - Hà Nội">VCB Ba Đình - 521 Kim Mã, Ba Đình, Hà Nội</Option>
-                  <Option value="Chi nhánh Bến Thành - TP.HCM">VCB Bến Thành - 69 Bùi Thị Xuân, Q.1, TP.HCM</Option>
-                  <Option value="Chi nhánh TP.HCM - Q.1">VCB TP.HCM - Tòa nhà Vietcombank Tower, Công trường Mê Linh, Q.1</Option>
-                  <Option value="Chi nhánh Đà Nẵng">VCB Đà Nẵng - 140-142 Lê Lợi, Hải Châu, Đà Nẵng</Option>
-                  <Option value="Chi nhánh Cần Thơ">VCB Cần Thơ - 3-5-7 Hòa Bình, Ninh Kiều, Cần Thơ</Option>
+                <Select size="large" showSearch optionFilterProp="children">
+                  {branches && branches.length > 0 ? (
+                    branches.map((b) => (
+                      <Option key={b.id} value={`${b.branchName} - ${b.city}`}>
+                        {b.branchName} - {b.address} ({b.city})
+                      </Option>
+                    ))
+                  ) : (
+                    <>
+                      <Option value="Chi nhánh Hoàn Kiếm - Hà Nội">VCB Hoàn Kiếm - 198 Trần Quang Khải, Hà Nội</Option>
+                      <Option value="Chi nhánh Ba Đình - Hà Nội">VCB Ba Đình - 521 Kim Mã, Ba Đình, Hà Nội</Option>
+                      <Option value="Chi nhánh Bến Thành - TP.HCM">VCB Bến Thành - 69 Bùi Thị Xuân, Q.1, TP.HCM</Option>
+                      <Option value="Chi nhánh TP.HCM - Q.1">VCB TP.HCM - Tòa nhà Vietcombank Tower, Công trường Mê Linh, Q.1</Option>
+                      <Option value="Chi nhánh Đà Nẵng">VCB Đà Nẵng - 140-142 Lê Lợi, Hải Châu, Đà Nẵng</Option>
+                      <Option value="Chi nhánh Cần Thơ">VCB Cần Thơ - 3-5-7 Hòa Bình, Ninh Kiều, Cần Thơ</Option>
+                    </>
+                  )}
                 </Select>
               </Form.Item>
 

@@ -65,6 +65,7 @@ export default function DashboardPage() {
     pendingApplications: 0,
     totalApplications: 0,
     approvedAmount: 0,
+    approvedCount: 0,
     usdSellRate: null,
     activeUsersCount: 0,
     totalPosts: 0,
@@ -98,44 +99,46 @@ export default function DashboardPage() {
 
       // 1. Phê duyệt & Báo cáo (Dành cho Quản lý phê duyệt & Admin)
       if (adminRole || managerRole) {
-        const [appRes, repRes, fxRes] = await Promise.allSettled([
+        const [appRes, repRes] = await Promise.allSettled([
           client.get('/approvals/applications', { params: { page: 0, size: 5 } }),
           client.get('/reports/dashboard'),
-          client.get('/data/exchange-rates/latest'),
         ]);
 
         const repData = repRes.status === 'fulfilled' ? repRes.value.data?.data : null;
         const appData = appRes.status === 'fulfilled' ? appRes.value.data?.data : null;
-        const fxData = fxRes.status === 'fulfilled' ? fxRes.value.data?.data : null;
-        const usd = Array.isArray(fxData) ? fxData.find((r) => r.currencyCode === 'USD') : null;
+        const approvedCount = repData?.byStatus?.find((s) => s.status === 'APPROVED')?.count || 0;
 
         setMetrics((prev) => ({
           ...prev,
           pendingApplications: repData?.pendingCount ?? (appData?.totalElements || 0),
           totalApplications: repData?.totalApplications ?? (appData?.totalElements || 0),
           approvedAmount: repData?.approvedAmount ?? 0,
-          usdSellRate: usd ? usd.sellRate : 25450,
+          approvedCount,
         }));
 
         if (appData?.content) setRecentApplications(appData.content);
       }
 
-      // 2. Hệ thống, CMS, Audit log (Dành cho Admin)
+      // 2. Hệ thống, CMS, Audit log & Dữ liệu thị trường (Dành cho Admin)
       if (adminRole) {
-        const [userRes, postRes, logRes] = await Promise.allSettled([
+        const [userRes, postRes, logRes, fxRes] = await Promise.allSettled([
           client.get('/system/users', { params: { page: 0, size: 5 } }),
           client.get('/cms/posts', { params: { page: 0, size: 4 } }),
           client.get('/system/audit-logs', { params: { page: 0, size: 5 } }),
+          client.get('/exchange-rates', { params: { page: 0, size: 10 } }),
         ]);
 
         const userData = userRes.status === 'fulfilled' ? userRes.value.data?.data : null;
         const postData = postRes.status === 'fulfilled' ? postRes.value.data?.data : null;
         const logData = logRes.status === 'fulfilled' ? logRes.value.data?.data : null;
+        const fxData = fxRes.status === 'fulfilled' ? fxRes.value.data?.data : null;
+        const usd = fxData?.content?.find((r) => r.currencyCode === 'USD');
 
         setMetrics((prev) => ({
           ...prev,
           activeUsersCount: userData?.totalElements ?? 4,
           totalPosts: postData?.totalElements ?? 0,
+          usdSellRate: usd ? usd.sellRate : 25800,
         }));
 
         if (logData?.content) setRecentAuditLogs(logData.content);
@@ -461,14 +464,13 @@ export default function DashboardPage() {
             </Col>
 
             <Col xs={24} sm={12} lg={6}>
-              <Card loading={loadingMetrics} hoverable onClick={() => (window.location.hash = '#/reports/dashboard')}>
+              <Card loading={loadingMetrics} hoverable onClick={() => (window.location.hash = '#/approvals')}>
                 <Statistic
-                  title="Tỷ giá USD thị trường"
-                  value={metrics.usdSellRate || 25450}
-                  precision={0}
+                  title="Hồ sơ đã phê duyệt"
+                  value={metrics.approvedCount || 0}
                   valueStyle={{ color: '#722ed1', fontWeight: 'bold' }}
-                  prefix={<DollarOutlined />}
-                  suffix="VND"
+                  prefix={<CheckCircleOutlined />}
+                  suffix="hồ sơ"
                 />
               </Card>
             </Col>
