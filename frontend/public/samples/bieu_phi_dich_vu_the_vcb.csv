@@ -1,0 +1,7 @@
+﻿category,serviceName,feeStandardVND,feeVipVND,note
+THẺ GHI NỢ,Phát hành thẻ ghi nợ nội địa chuẩn,50000,0,Miễn phí khi mở online
+THẺ GHI NỢ,Phát hành thẻ ghi nợ quốc tế Visa/Mastercard,100000,0,Hạng Chuẩn/Vàng
+THẺ TÍN DỤNG,Phí thường niên thẻ Vietcombank Visa Signature,3000000,1500000,Hoàn phí khi đạt doanh số chi tiêu
+THẺ TÍN DỤNG,Phí thường niên thẻ Vietcombank Visa Platinum,800000,0,Ưu đãi khách hàng VIP
+GIAO DỊCH ATM,Rút tiền tại ATM trong hệ thống Vietcombank,1100,0,Đã bao gồm VAT
+GIAO DỊCH ATM,Rút tiền tại ATM ngoài hệ thống Napas,3300,0,Đã bao gồm VAT

@@ -1,0 +1,7 @@
+﻿category,serviceName,feeStandardVND,feeVipVND,note
+TÀI KHOẢN,Phí quản lý tài khoản thanh toán VND,0,0,Miễn phí trọn đời
+TÀI KHOẢN,Phí duy trì số dư tối thiểu tài khoản,0,0,Không yêu cầu số dư tối thiểu
+CHUYỂN TIỀN,Chuyển tiền nội bộ Vietcombank trên Digibank,0,0,Miễn phí toàn bộ
+CHUYỂN TIỀN,Chuyển tiền nhanh 24/7 Napas ngoài hệ thống,0,0,Miễn phí trên VCB Digibank
+CHUYỂN TIỀN,Chuyển tiền tại quầy cùng hệ thống,11000,0,Giao dịch dưới 500 triệu VND
+CHUYỂN TIỀN,Chuyển tiền liên ngân hàng tại quầy,22000,0,Tối thiểu 22.000 VND / giao dịch

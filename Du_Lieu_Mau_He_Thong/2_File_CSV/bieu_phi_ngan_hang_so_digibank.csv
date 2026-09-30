@@ -1,0 +1,6 @@
+﻿category,serviceName,feeStandardVND,feeVipVND,note
+VCB DIGIBANK,Phí đăng ký và kích hoạt ứng dụng,0,0,Miễn phí
+VCB DIGIBANK,Phí duy trì dịch vụ VCB Digibank hàng tháng,0,0,Miễn phí
+SMS CHỦ ĐỘNG,Gói thông báo biến động số dư qua SMS (1-20 SMS),11000,0,11.000 VND / tháng / số
+SMS CHỦ ĐỘNG,Gói thông báo SMS không giới hạn,55000,0,55.000 VND / tháng / số
+XÁC THỰC,Phương thức xác thực VCB Smart OTP,0,0,Miễn phí tích hợp trên App

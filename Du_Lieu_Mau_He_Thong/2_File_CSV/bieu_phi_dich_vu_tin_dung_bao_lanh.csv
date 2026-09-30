@@ -1,0 +1,6 @@
+﻿category,serviceName,feeStandardVND,feeVipVND,note
+TÍN DỤNG,Phí thẩm định hồ sơ vay vốn cá nhân,0,0,Miễn phí thẩm định ban đầu
+TÍN DỤNG,Phí trả nợ trước hạn (năm thứ 1 - 2),1.5%,0.5%,Tính trên số tiền gốc trả trước
+TÍN DỤNG,Phí trả nợ trước hạn (từ năm thứ 5 trở đi),0,0,Miễn phí hoàn toàn
+BẢO LÃNH,Phát hành bảo lãnh dự thầu doanh nghiệp,0.2%,0.15%,Tối thiểu 500.000 VND / chứng thư
+BẢO LÃNH,Phát hành bảo lãnh thực hiện hợp đồng,0.3%,0.2%,Tối thiểu 1.000.000 VND / chứng thư

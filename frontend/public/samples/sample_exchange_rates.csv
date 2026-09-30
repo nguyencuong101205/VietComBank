@@ -1,4 +1,4 @@
-currencyCode,buyRate,sellRate,transferRate,effectiveDate
+﻿currencyCode,buyRate,sellRate,transferRate,effectiveDate
 USD,25150.0000,25480.0000,25200.0000,2026-09-29
 EUR,26850.0000,28320.0000,27120.0000,2026-09-29
 GBP,32150.0000,33520.0000,32470.0000,2026-09-29
