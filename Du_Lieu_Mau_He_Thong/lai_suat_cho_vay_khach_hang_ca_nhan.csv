@@ -1,4 +1,4 @@
-﻿productCode,termMonths,ratePercentage,effectiveDate
+﻿Mã sản phẩm / Gói lãi suất,Kỳ hạn áp dụng (tháng),Mức lãi suất (%/năm),Ngày hiệu lực
 LOAN_MORTGAGE_HOME,120,6.50,2026-09-30
 LOAN_AUTO_PURCHASE,60,6.90,2026-09-30
 LOAN_CONSUMER_UNSECURED,36,8.20,2026-09-30

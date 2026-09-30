@@ -1,5 +1,5 @@
-﻿Gói dịch vụ Ngân hàng số,Hạn mức tối đa / giao dịch (VND),Hạn mức tối đa / ngày (VND),Phương thức xác thực,Phí duy trì
-Gói Cơ bản (Khởi đầu),"100,000,000","500,000,000",SMS OTP,Miễn phí
-Gói Nâng cao (Tiêu chuẩn),"1,000,000,000","3,000,000,000",VCB Smart OTP tích hợp App,Miễn phí
-Gói Priority VIP,"3,000,000,000","10,000,000,000",VCB Smart OTP + Sinh trắc học,Miễn phí
-Gói Doanh nghiệp & Chủ hộ KD,"5,000,000,000","20,000,000,000",Hard Token OTP / Chữ ký số CA,Miễn phí
+﻿Gói dịch vụ Ngân hàng số,Hạn mức tối đa / giao dịch (VND),Hạn mức tối đa / ngày (VND),Phương thức xác thực an toàn,Phí duy trì dịch vụ
+Gói Cơ bản (Khởi đầu),100000000,500000000,SMS OTP,Miễn phí trọn đời
+Gói Nâng cao (Tiêu chuẩn),1000000000,3000000000,VCB Smart OTP tích hợp App,Miễn phí trọn đời
+Gói Priority VIP,3000000000,10000000000,VCB Smart OTP + Sinh trắc học,Miễn phí trọn đời
+Gói Doanh nghiệp & Chủ hộ KD,5000000000,20000000000,Hard Token OTP / Chữ ký số CA,Miễn phí trọn đời

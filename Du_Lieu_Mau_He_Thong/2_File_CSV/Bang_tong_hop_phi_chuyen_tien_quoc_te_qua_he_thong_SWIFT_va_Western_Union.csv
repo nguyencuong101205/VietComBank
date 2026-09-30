@@ -1,6 +1,6 @@
-﻿Dịch vụ chuyển tiền quốc tế,Mức phí tiêu chuẩn,Mức thu tối thiểu,Mức thu tối đa,Ghi chú phí ngân hàng đại lý
-SWIFT - Chuyển tiền đi (Phí SHA),0.20% số tiền chuyển,5.00 USD,200.00 USD,Bên nhận chịu phí ngân hàng trung gian
-SWIFT - Chuyển tiền đi (Phí OUR),0.20% + 25 USD cước cố định,30.00 USD,250.00 USD,Người gửi thanh toán toàn bộ chi phí
+﻿Kênh chuyển tiền quốc tế,Mức phí tiêu chuẩn,Mức thu tối thiểu,Mức thu tối đa,Ghi chú phí ngân hàng đại lý
+SWIFT - Chuyển tiền đi quốc tế (Phí SHA),0.20% số tiền chuyển,5.00 USD,200.00 USD,Bên nhận chịu phí ngân hàng trung gian
+SWIFT - Chuyển tiền đi quốc tế (Phí OUR),0.20% + 25 USD cước cố định,30.00 USD,250.00 USD,Người gửi thanh toán toàn bộ chi phí
 SWIFT - Nhận tiền từ nước ngoài vào TK,0.05% số tiền ghi có,2.00 USD,50.00 USD,Miễn phí nếu nhận bằng VND
 Western Union - Nhận tiền quốc tế,Miễn phí 100%,0 USD,0 USD,Nhận tại quầy hoặc nhận qua VCB Digibank
-Western Union - Gửi tiền đi định cư/học tập,Theo bậc tiền (0.3% - 0.5%),10.00 USD,Theo biểu WU,Nhanh chóng trong vòng vài phút
+Western Union - Gửi tiền đi du học / trợ cấp,Theo bậc tiền (0.3% - 0.5%),10.00 USD,Theo biểu WU,Nhanh chóng nhận ngay trong vài phút

@@ -1,4 +1,4 @@
-﻿productCode,termMonths,ratePercentage,effectiveDate
+﻿Mã sản phẩm / Gói lãi suất,Kỳ hạn áp dụng (tháng),Mức lãi suất (%/năm),Ngày hiệu lực
 CORP_DEPOSIT_1M,1,1.90,2026-09-30
 CORP_DEPOSIT_3M,3,2.20,2026-09-30
 CORP_DEPOSIT_6M,6,3.10,2026-09-30
